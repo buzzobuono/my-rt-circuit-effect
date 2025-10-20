@@ -1,0 +1,6 @@
+R1 0 1 1M
+
+VIN 1 0 DC 0.0
+
+.INPUT 1
+.OUTPUT 1

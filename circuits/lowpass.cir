@@ -1,0 +1,10 @@
+.title Lowpass filter
+
+R 1 2 100
+CLP 2 0 2.4e-1
+
+VIN 1 0 DC 0
+
+.INPUT 1
+.OUTPUT 2
+.end

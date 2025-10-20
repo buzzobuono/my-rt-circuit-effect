@@ -1,0 +1,43 @@
+* Fuzz Face Guitar Pedal Circuit
+* Classic 2-transistor germanium fuzz
+* Node 0 = Ground
+* Node 1 = Input (audio in)
+* Node 6 = Output (audio out)
+
+* Input coupling capacitor
+C1 1 2 2.2u
+
+* Q1 Stage - Input transistor
+* Collector bias
+R1 3 7 33k
+* Base bias
+R2 2 0 100k
+* Transistor Q1 (collector=3, base=2, emitter=0)
+Q1 3 2 0 NPN
+
+* Q2 Stage - Output transistor
+* Collector load
+R3 4 7 8.2k
+* Emitter resistor
+R4 3 0 470
+* Fuzz control (simulates 1k pot at 50%)
+R5 2 7 500
+* Transistor Q2 (collector=4, base=3, emitter=0)
+Q2 4 3 0 NPN
+
+* Output coupling capacitor
+C2 4 6 10u
+
+* Output load (simulates amp input impedance)
+R6 6 0 1M
+
+* Power supply (+9V)
+V1 7 0 DC 9.0
+* Input signal
+VIN 1 0 DC 0.0
+
+* Circuit configuration
+.INPUT 1
+.OUTPUT 6
+
+.end

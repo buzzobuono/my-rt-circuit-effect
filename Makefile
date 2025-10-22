@@ -1,12 +1,16 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -O3 #-Wall -Wextra -fsanitize=address
-INCLUDES = -I/usr/include/eigen3
+INCLUDES = -I/usr/include/eigen3 -Iinclude
 LIBS_SNDFILE = -lsndfile
 
-all: wav_processor
+SRCS = $(wildcard src/*.cpp)
+TARGET = wav_processor
 
-wav_processor: wav_processor.cpp clean
-	$(CXX) $(CXXFLAGS) $(INCLUDES) wav_processor.cpp -o wav_processor $(LIBS_SNDFILE) ${DEBUG}
+all: ${TARGET}
+
+$(TARGET): clean
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/wav_processor.cpp -o $(TARGET) $(LIBS_SNDFILE) ${DEBUG}
 
 clean:
-	rm -f wav_processor
+	rm -f $(TARGET)
+

@@ -1,7 +1,7 @@
 * Test NPN Amplifier - audio presente
 
 * Input AC
-VIN 1 0 AC 0   ; picco 0.1V
+VIN 1 0 AC 0
 RIN 1 2 100k
 CIN 2 3 100n
 

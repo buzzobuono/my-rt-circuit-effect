@@ -17,19 +17,39 @@ if len(data.shape) > 1:
 else:
     channel_1 = data
 
-# Crea lo spettrogramma
-plt.figure(figsize=(12, 6))
-plt.specgram(channel_1, Fs=sample_rate, NFFT=2048, noverlap=1024, cmap='inferno')
+# Calcola la FFT (Fast Fourier Transform)
+N = len(channel_1)
+fft_vals = np.fft.rfft(channel_1)
+fft_freqs = np.fft.rfftfreq(N, d=1/sample_rate)
 
-plt.xlabel('Tempo (s)')
-plt.ylabel('Frequenza (Hz)')
-plt.title(f'Spettrogramma - Canale 1 (Sample Rate: {sample_rate} Hz)')
-plt.colorbar(label='Intensità (dB)')
+# Calcola il modulo (ampiezza) e converte in dB
+magnitude = np.abs(fft_vals)
+magnitude_db = 20 * np.log10(magnitude + 1e-10)  # eviti log(0)
+
+# Trova la frequenza con ampiezza massima
+peak_idx = np.argmax(magnitude)
+peak_freq = fft_freqs[peak_idx]
+peak_amp_db = magnitude_db[peak_idx]
+
+# Crea il grafico
+plt.figure(figsize=(12, 6))
+plt.plot(fft_freqs, magnitude_db, linewidth=0.7)
+plt.xlabel('Frequenza (Hz)')
+plt.ylabel('Ampiezza (dB)')
+plt.title(f'Spettro in frequenza - Canale 1 (Sample Rate: {sample_rate} Hz)')
+plt.grid(True, alpha=0.3)
+plt.xscale('log')
+
+# Evidenzia il picco
+plt.axvline(peak_freq, color='red', linestyle='--', alpha=0.7, label=f'Picco: {peak_freq:.1f} Hz')
+plt.legend()
+
 plt.tight_layout()
 plt.show()
 
 # Stampa info
-duration = len(channel_1) / sample_rate
+duration = N / sample_rate
 print(f"Durata: {duration:.2f} secondi")
 print(f"Sample rate: {sample_rate} Hz")
-print(f"Numero di campioni: {len(channel_1)}")
+print(f"Numero di campioni: {N}")
+print(f"Frequenza di picco: {peak_freq:.2f} Hz ({peak_amp_db:.1f} dB)")

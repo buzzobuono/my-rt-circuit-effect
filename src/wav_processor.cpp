@@ -1,51 +1,23 @@
-// wav_app.cpp - Corrected WAV file processor
-// Compile: g++ -std=c++17 -O3 -I/usr/include/eigen3 wav_app.cpp -o wav_processor -lsndfile
-
-#include "circuit_solver.h"
+#include "audio_processor.h"
 #include <sndfile.h>
-#include <iostream>
-#include <vector>
-#include <cmath>
-#include <algorithm>
-
-/*
-    # Basso passivo (Fender P-Bass)
-    ./wav_processor bass.wav output.wav circuit.cir 0.3 9
-
-    # Basso attivo (Ibanez SR con preamp)
-    ./wav_processor bass.wav output.wav circuit.cir 1.5 9
-
-    # Chitarra hot pickup (EMG)
-    ./wav_processor guitar.wav output.wav circuit.cir 1.0 18
-*/
 
 class WavFileProcessor {
 private:
     AudioProcessor processor;
     float input_voltage_scale;   // WAV [-1,+1] → Voltage
-    float output_voltage_scale;  // Voltage → WAV [-1,+1]
-    float supply_voltage;        // Circuit power supply rails
     bool use_soft_clipping;
-    bool auto_normalize_output;
     
 public:
-    WavFileProcessor(const std::string& netlist, double sample_rate,
-                     float input_peak_voltage = 0.5f,    // Typical passive bass
-                     float supply_v = 0.0f,              // Typical pedal
-                     bool soft_clip = true,
-                     bool auto_normalize = true)
+    WavFileProcessor(const std::string& netlist, 
+                    double sample_rate,
+                    float input_peak_voltage,    // Typical passive bass
+                    bool soft_clip)
         : processor(netlist, sample_rate, 1.0, 1.0),    // No gain in processor
           input_voltage_scale(input_peak_voltage),
-          supply_voltage(supply_v),
-          use_soft_clipping(soft_clip),
-          auto_normalize_output(auto_normalize) {
-        
-        // Output scale: normalize back from supply voltage to [-1, +1]
-        output_voltage_scale = 1.0f / supply_voltage;
+          use_soft_clipping(soft_clip) {
         
         std::cout << "Audio scaling configuration:" << std::endl;
         std::cout << "  Input peak voltage: ±" << input_voltage_scale << " V" << std::endl;
-        std::cout << "  Supply voltage: ±" << supply_voltage << " V" << std::endl;
         std::cout << "  Clipping mode: " << (soft_clip ? "Soft (tanh)" : "Hard") << std::endl;
     }
     
@@ -120,26 +92,26 @@ public:
                 voltage_out = 0.0f;
             }
             
-            // 4. Clip to supply rails (hard limit)
-            bool clipped = false;
-            if (voltage_out > supply_voltage) {
-                voltage_out = supply_voltage;
-                clipped = true;
-            } else if (voltage_out < -supply_voltage) {
-                voltage_out = -supply_voltage;
-                clipped = true;
-            }
-            if (clipped) clip_count++;
             
-            // 5. Convert voltage to WAV scale
-            float wav_out = voltage_out * output_voltage_scale;
-            
-            // 6. Optional soft clipping (analog-like saturation)
-            if (use_soft_clipping) {
-                // Tanh soft clipping (smooth saturation)
-                wav_out = std::tanh(wav_out * 1.2f);
+            // 5. Convert voltage to WAV - PRESERVE CIRCUIT GAIN!
+            // If circuit amplifies 2V→6V (3x), then wav should also do 3x
+            float wav_out;
+            if (std::abs(voltage_in) > 1e-6f) {
+                // Preserve gain ratio: wav_out/wav_in = voltage_out/voltage_in
+                float circuit_gain = voltage_out / voltage_in;
+                wav_out = wav_in * circuit_gain;
             } else {
-                // Hard clipping to [-1, +1]
+                // For very small inputs, use direct voltage scaling
+                // (avoid division by zero, but this rarely happens)
+                wav_out = voltage_out / input_voltage_scale;
+            }
+            
+            // 6. Optional soft clipping (analog-like saturation at output stage)
+            if (use_soft_clipping) {
+                // Tanh soft clipping - simulates output stage saturation
+                wav_out = std::tanh(wav_out);
+            } else {
+                // Hard clipping to [-1, +1] to prevent digital overflow
                 wav_out = std::max(-1.0f, std::min(1.0f, wav_out));
             }
             
@@ -157,28 +129,6 @@ public:
         // Calculate RMS
         rms_in = std::sqrt(rms_in / total);
         rms_out = std::sqrt(rms_out / total);
-        
-        // Auto-normalization: boost output to use full dynamic range
-        // Leave 1dB headroom to prevent clipping
-        if (auto_normalize_output && peak_out > 1e-6f) {
-            const float target_peak = 0.89f;  // -1dBFS
-            float normalize_gain = target_peak / peak_out;
-            
-            // Apply normalization
-            for (auto& sample : output_samples) {
-                sample *= normalize_gain;
-            }
-            
-            // Update statistics
-            float old_peak = peak_out;
-            peak_out *= normalize_gain;
-            rms_out *= normalize_gain;
-            
-            std::cout << "\nAuto-normalization applied:" << std::endl;
-            std::cout << "  Peak boost: " << 20*std::log10(normalize_gain) << " dB" << std::endl;
-            std::cout << "  Before: " << 20*std::log10(old_peak) << " dBFS" << std::endl;
-            std::cout << "  After:  " << 20*std::log10(peak_out) << " dBFS" << std::endl;
-        }
         
         // Print statistics
         std::cout << "\nAudio statistics:" << std::endl;
@@ -231,23 +181,20 @@ int main(int argc, char* argv[]) {
     
     if (argc < 4) {
         std::cerr << "Usage: " << argv[0] 
-                  << " <input.wav> <output.wav> <circuit.cir> [input_voltage] [supply_voltage]" 
+                  << " <input.wav> <output.wav> <circuit.cir> [input_voltage]" 
                   << std::endl;
         std::cerr << "\nExamples:" << std::endl;
         std::cerr << "  Passive bass:  " << argv[0] 
-                  << " bass.wav fuzz.wav fuzzface.cir 0.3 9" << std::endl;
+                  << " bass.wav fuzz.wav fuzzface.cir 0.3" << std::endl;
         std::cerr << "  Active bass:   " << argv[0] 
-                  << " bass.wav fuzz.wav fuzzface.cir 1.5 9" << std::endl;
+                  << " bass.wav fuzz.wav fuzzface.cir 1.5" << std::endl;
         std::cerr << "  Hot pickup:    " << argv[0] 
-                  << " guitar.wav dist.wav distortion.cir 1.0 18" << std::endl;
+                  << " guitar.wav dist.wav distortion.cir 1.0" << std::endl;
         std::cerr << "\nVoltage parameters:" << std::endl;
         std::cerr << "  input_voltage  - Peak voltage from instrument (default: 0.5V)" << std::endl;
         std::cerr << "                   Passive bass/guitar: 0.2-0.5V" << std::endl;
         std::cerr << "                   Active bass: 0.5-2.0V" << std::endl;
         std::cerr << "                   Hot humbuckers: 0.8-1.5V" << std::endl;
-        std::cerr << "  supply_voltage - Circuit power supply (default: 9V)" << std::endl;
-        std::cerr << "                   Battery pedals: 9V" << std::endl;
-        std::cerr << "                   Rack units: 12V, 15V, or 18V" << std::endl;
         return 1;
     }
     
@@ -257,18 +204,12 @@ int main(int argc, char* argv[]) {
     
     // Defaults for passive bass
     float input_voltage = 0.5f;    // ±0.5V peak
-    float supply_voltage = 9.0f;   // Standard 9V pedal
     
     if (argc >= 5) input_voltage = std::atof(argv[4]);
-    if (argc >= 6) supply_voltage = std::atof(argv[5]);
     
     // Validation
     if (input_voltage <= 0 || input_voltage > 10) {
         std::cerr << "Error: input_voltage must be between 0 and 10V" << std::endl;
-        return 1;
-    }
-    if (supply_voltage <= 0 || supply_voltage > 50) {
-        std::cerr << "Error: supply_voltage must be between 0 and 50V" << std::endl;
         return 1;
     }
     
@@ -284,17 +225,13 @@ int main(int argc, char* argv[]) {
         double sample_rate = sf_info.samplerate;
         sf_close(tmp);
         
-        // Create processor with proper voltage scaling
-        WavFileProcessor wav_processor(netlist_file, sample_rate, 
-                                       input_voltage, supply_voltage, true);
-        
+        WavFileProcessor wav_processor(netlist_file, sample_rate, input_voltage, true);
         if (!wav_processor.process(input_file, output_file)) {
             return 1;
         }
         
     } catch (const std::exception& e) {
-        std::cerr << "[ERROR] Exception type: " << typeid(e).name()
-              << ", message: " << e.what() << std::endl;
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
     

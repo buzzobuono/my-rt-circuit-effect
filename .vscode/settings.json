@@ -56,6 +56,10 @@
         "thread": "cpp",
         "typeinfo": "cpp",
         "iomanip": "cpp",
-        "core": "cpp"
-    }
+        "core": "cpp",
+        "component.h": "c",
+        "dense": "cpp",
+        "eigenvalues": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "enabled"
 }

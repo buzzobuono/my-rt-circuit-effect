@@ -19,6 +19,7 @@
 #include "components/diode.h"
 #include "components/bjt.h"
 #include "components/mosfet.h"
+#include "components/probe.h"
 
 class Circuit {
 public:
@@ -26,9 +27,11 @@ public:
     int num_nodes;
     int input_node;
     int output_node;
-    std::map<std::string, VoltageSource*> voltage_sources;
+    std::vector<int> probe_nodes;
+
+    //std::map<std::string, VoltageSource*> voltage_sources;
     
-    Circuit() : num_nodes(0), input_node(-1), output_node(-1) {}
+    Circuit() : num_nodes(0), output_node(-1) {}
     
     bool loadNetlist(const std::string& filename) {
         std::ifstream file(filename);
@@ -78,13 +81,22 @@ public:
                     std::string model;
                     iss >> n1 >> n2 >> model;
                     double Is, n, Vt;
+                    double Cj0;   // Capacità (0 = disabilita)
+                    double Vj;
+                    double Mj;
                     std::string token;
                     while (iss >> token) {
                         if (token.find("Is=") == 0) Is = std::stod(token.substr(3));
                         else if (token.find("N=") == 0) n = std::stod(token.substr(2));
                         else if (token.find("Vt=") == 0) Vt = std::stod(token.substr(3));
+                        else if (token.find("Cj0=") == 0) Cj0 = std::stod(token.substr(4));
+                        else if (token.find("Vj=") == 0) Vj = std::stod(token.substr(3));
+                        else if (token.find("Mj=") == 0) Mj = std::stod(token.substr(3));
                     }
-                    components.push_back(std::make_unique<Diode>(comp_name, n1, n2, Is, n, Vt));
+                    
+                    std::cout << "[Diode] name=" << comp_name << " model=" << model << " n1=" << n1 << " n2=" << n2 <<" Is=" << Is << " N=" << n << " Vt=" << Vt << " Cj0=" << Cj0 << " Vj=" << Vj << " Mj=" << Mj << std::endl;
+                    
+                    components.push_back(std::make_unique<Diode>(comp_name, n1, n2, Is, n, Vt, Cj0, Vj, Mj));
                     
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
@@ -129,16 +141,30 @@ public:
                     double value;
                     iss >> n1 >> n2 >> dcstr >> value;
                     auto vs = std::make_unique<VoltageSource>(comp_name, n1, n2, value);
-                    voltage_sources[comp_name] = vs.get();
+                    //voltage_sources[comp_name] = vs.get();
+                    std::cout << "[VoltageSource] name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << value << std::endl;
                     components.push_back(std::move(vs));
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
+                //case 'P': {
+                //    int n;
+                //    iss >> n;
+                //    std::cout << "[Probe] name=" << comp_name << " n=" << n << std::endl;
+                //    components.push_back(std::make_unique<Probe>(comp_name, n));
+                //    max_node = std::max(max_node, n);
+                //    break;
+                //}
                 case '.': {
-                    if (comp_name == ".INPUT") {
+                    if (comp_name == ".input") {
                         iss >> input_node;
-                    } else if (comp_name == ".OUTPUT") {
+                    } else if (comp_name == ".output") {
                         iss >> output_node;
+                    } else if (comp_name == ".probe") {
+                        int probe_node;
+                        iss >> probe_node;
+                        std::cout << "Probe on node " << probe_node << std::endl;
+                        probe_nodes.push_back(probe_node);
                     }
                     break;
                 }
@@ -154,7 +180,7 @@ public:
         std::cout << "Loaded circuit: " << components.size() << " components, "
                   << num_nodes << " nodes" << std::endl;
         
-        return input_node >= 0 && output_node >= 0;
+        return output_node >= 0;
     }
     
     void reset() {

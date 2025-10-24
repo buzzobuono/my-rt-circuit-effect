@@ -17,12 +17,14 @@ private:
     double dt;
     int max_iterations;
     double tolerance;
+    int input_impedance;
     
 public:
-    CircuitSolver(Circuit& ckt, double sample_rate, 
-                  int max_iter = 10, double tol = 1e-4) 
+    CircuitSolver(Circuit& ckt, double sample_rate, int input_impedance,
+                  int max_iter = 10, double tol = 1e-5) 
         : circuit(ckt), 
           dt(1.0 / sample_rate),
+          input_impedance(input_impedance),
           max_iterations(max_iter),
           tolerance(tol) {
         
@@ -37,10 +39,10 @@ public:
         static int sample_count = 0;
         
         // Set input voltage
-        if (circuit.voltage_sources.count("VIN") > 0) {
-            circuit.voltage_sources["VIN"]->setVoltage(input_voltage);
-        }
-        
+        //if (circuit.voltage_sources.count("VIN") > 0) {
+        //    circuit.voltage_sources["VIN"]->setVoltage(input_voltage);
+        //}
+
         // Newton-Raphson iteration
         double final_error = 0.0;
         
@@ -48,10 +50,32 @@ public:
             G.setZero();
             I.setZero();
             
+            if (sample_count == 0 && iter == 0) {
+                std::cout << "=== Component stamping order ===" << std::endl;
+                for (size_t i = 0; i < circuit.components.size(); i++) {
+                    std::cout << i << ": " << circuit.components[i]->name 
+                            << " (type " << (int)circuit.components[i]->type << ")" 
+                            << std::endl;
+                }
+            }
             // Stamp all components
             for (auto& comp : circuit.components) {
                 comp->stamp(G, I, V, dt);
             }
+
+            double input_g = 1.0 / input_impedance;
+            
+            if (circuit.input_node > 0) {
+                G(circuit.input_node, circuit.input_node) += input_g;
+                I(circuit.input_node) += input_voltage * input_g;
+            }
+            // ================================================
+            
+            //std::cout << "---" << std::endl;
+            //for (size_t i = 0; i < circuit.components.size(); ++i) {
+            //    std::cout << "Component " << i << ": " 
+            //            << circuit.components[i]->name << std::endl;
+            //}
             
             // Ground node constraint (DOPO stamp per sicurezza)
             G(0, 0) = 1.0;
@@ -65,7 +89,7 @@ public:
             final_error = error;  // Salva per debug
             
             // Debug output
-            if (sample_count < 5) {
+            /*if (sample_count < 5) {
                 std::cout << "Sample " << sample_count << ", Iter " << iter 
                         << ": error = " << error << std::endl;
                 if (iter == 0) {
@@ -76,7 +100,7 @@ public:
                     std::cout << std::endl;
                 }
             }
-            
+            */
             // Convergence check
             if (error < tolerance) {
                 V = V_new;  // ✓ Aggiorna SOLO quando converge

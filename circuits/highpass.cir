@@ -2,8 +2,6 @@
 
 C1 1 2 100n
 R1 2 0 1.6k
-VIN 1 0 DC 0
 
-.INPUT 1
-.OUTPUT 2
-.end
+.input 1
+.output 2

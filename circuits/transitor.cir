@@ -1,0 +1,16 @@
+* Alimentazione
+VCC 1 0 DC 9.0
+
+* Partitore di bias per la base
+RB_TOP 1 2 820k
+RB_BOT 2 0 120k
+
+* Transistor NPN (collettore-base-emettitore)
+* Q1 nodo_collettore nodo_base nodo_emettitore nome_modello
+Q1 1 2 3 Q2N2222 Is=14.34e-15 Bf=255.9 Br=6.092 Vt=0.026
+
+* Resistenza di emettitore
+RE 3 0 1M
+
+.input 3
+.output 1

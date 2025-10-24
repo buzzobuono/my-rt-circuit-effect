@@ -1,0 +1,29 @@
+VCC 1 0 DC 9.0
+
+R1 1 2 100k
+
+C1 3 2 100n
+
+R2 2 0 100k
+
+.input 3
+.output 2
+
+* === COMPORTAMENTO ATTESO ===
+*
+* INIZIALIZZAZIONE (primi sample):
+* - V(2) e V(3) si equalizzano gradualmente
+* - Il condensatore si carica/scarica fino al bias
+* - Può richiedere ~5τ = 5 × R × C ≈ 5 × 100k × 10µF = 5 secondi
+*   Ma con sample rate 44.1kHz, sono ~220k samples!
+*
+* REGIME (dopo l'inizializzazione):
+* - DC: V(2) ≈ V(3) (equalizzati attraverso il condensatore)
+* - AC: Il segnale passa attraverso il condensatore
+* - V(2) oscilla intorno al bias seguendo VIN
+*
+* ESEMPIO CON SEGNALE 440Hz, 100mV:
+* Se VIN(t) = 0V + 0.1sin(2π×440×t):
+*   - V(3) oscilla: 0V ± 100mV
+*   - V(2) oscilla: ~1.3V ± 100mV (bias + AC)
+*   - Il condensatore trasferisce solo la componente AC

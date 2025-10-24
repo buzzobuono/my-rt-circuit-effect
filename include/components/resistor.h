@@ -10,30 +10,31 @@
 #include "component.h"
 
 class Resistor : public Component {
-    
-public:
-    double R;
+private:
+    double _r;
 
-    Resistor(const std::string& comp_name, int node1, int node2, double resistance) {
-        if (resistance <= 0) {
+public:
+
+    Resistor(const std::string& comp_name, int n1, int n2, double r) {
+        if (r <= 0) {
             throw std::runtime_error(std::string("Resistance must be positive"));
         }
-        if (node1 == node2) {
+        if (n1 == n2) {
             throw std::runtime_error(std::string("Resistor nodes must be different"));
         }
         type = ComponentType::RESISTOR;
         name = comp_name;
-        nodes = { node1, node2 };
-        R = resistance;
+        nodes = { n1, n2 };
+        _r = r;
     }
     
     void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
         const double R_MIN = 1e-12; // Resistenza minima
         const double R_MAX = 1e12; // Oltre questa soglia, consideri circuito aperto
         
-        if (R > R_MAX) return; // Non stampare nulla
+        if (_r > R_MAX) return; // Non stampare nulla
         
-        double g = 1.0 / std::max(R, R_MIN);
+        double g = 1.0 / std::max(_r, R_MIN);
         
         int n1 = nodes[0], n2 = nodes[1];
         
@@ -48,7 +49,7 @@ public:
     }
     
     double getResistance() const { 
-        return R; 
+        return _r; 
     }
 
 };

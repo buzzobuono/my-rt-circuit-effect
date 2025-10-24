@@ -1,0 +1,33 @@
+* Buffer Emitter Follower - Test Transistor Model
+* Configurazione minima per test
+
+* Alimentazione
+VCC 1 0 DC 12V
+
+* Segnale di ingresso (1kHz, 100mV amplitude)
+VIN 2 0 DC 6V AC 100mV SIN(6V 100mV 1kHz)
+
+* Resistenza di base
+RB 2 3 10k
+
+* Transistor NPN (da sostituire con il tuo modello)
+Q1 1 3 4 Q2N2222
+
+* Resistenza di emettitore
+RE 4 0 1k
+
+* Carico (opzionale per test)
+RL 4 0 10k
+
+* Modello transistor generico 2N2222
+.MODEL Q2N2222 NPN(IS=14.34E-15 BF=255.9 VAF=74.03 IKF=0.2847 
++ NE=1.307 ISE=14.34E-15 BR=6.092 VAR=24 IKR=0 NC=2 ISC=0 
++ RE=0.1 RB=0.1 RC=1 CJE=25.08E-12 VJE=0.75 MJE=0.33 
++ CJC=7.306E-12 VJC=0.75 MJC=0.33)
+
+* Analisi
+.OP
+.AC DEC 10 10 100k
+.TRAN 0.01ms 100ms
+
+.END

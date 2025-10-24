@@ -20,9 +20,6 @@ public:
         name = nm;
         nodes = {np, nn};
         voltage = v;
-        std::cout << "[VoltageSource] Created " << name
-              << " (nm=" << nm << ", np=" << np << ", nn=" << nn << ")"
-              << "  v=" << v << std::endl;
     }
     
     void setVoltage(double v) { voltage = v; }
@@ -30,6 +27,7 @@ public:
     
     void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, 
                const Eigen::VectorXd& V, double dt) override {
+        //double Rs = 1e-9;
         double Rs = 1.0;
         double g = 1.0 / Rs;
         int n1 = nodes[0], n2 = nodes[1];

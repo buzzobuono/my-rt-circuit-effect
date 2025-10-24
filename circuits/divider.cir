@@ -1,0 +1,8 @@
+.title Partitore di tensione
+
+VCC 1 0 DC 9.0
+RB_TOP 1 2 820k
+RB_BOT 2 0 120k
+
+.input 2
+.output 2

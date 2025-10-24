@@ -11,6 +11,7 @@ protected:
     
     // Realistic voltage levels (in Volts)
     double input_voltage_max;   // Max input voltage to circuit
+    int input_impedance;
     double output_voltage_max;  // Expected max output voltage
     
     // Audio normalization
@@ -27,12 +28,14 @@ protected:
 public:
     AudioProcessor(const std::string& netlist_file, 
                    double sr,
-                   double input_v_max = 0.2,      // 200mV (realistic guitar)
-                   double output_v_max = 2.0,     // 2V expected output
+                   double input_v_max,
+                   int input_impedance,
+                   double output_v_max,
                    double in_headroom = 0.8,      // Use 80% of digital range
                    double out_headroom = 0.8)
         : sample_rate(sr), 
           input_voltage_max(input_v_max),
+          input_impedance(input_impedance),
           output_voltage_max(output_v_max),
           input_headroom(in_headroom),
           output_headroom(out_headroom) {
@@ -47,16 +50,7 @@ public:
             throw std::runtime_error("Failed to load netlist");
         }
         
-        solver = std::make_unique<CircuitSolver>(circuit, sample_rate);
-        
-        std::cout << "\n=== DC Operating Point ===" << std::endl;
-        for (int n = 0; n < circuit.num_nodes; n++) {
-            std::cout << "  V(" << n << ") = " << solver->getNodeVoltage(n) << " V";
-            if (n == circuit.output_node) {
-                std::cout << " ← OUTPUT DC BIAS";
-            }
-            std::cout << std::endl;
-        }
+        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance);
         
         std::cout << "\nReady to process audio.\n" << std::endl;
     }

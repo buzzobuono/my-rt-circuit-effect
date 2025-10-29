@@ -19,7 +19,9 @@
 #include "components/diode.h"
 #include "components/bjt.h"
 #include "components/mosfet.h"
-#include "components/probe.h"
+
+#include <Eigen/Dense>
+#include <Eigen/LU>  
 
 class Circuit {
 public:
@@ -29,8 +31,6 @@ public:
     int output_node;
     std::vector<int> probe_nodes;
 
-    //std::map<std::string, VoltageSource*> voltage_sources;
-    
     Circuit() : num_nodes(0), output_node(-1) {}
     
     bool loadNetlist(const std::string& filename) {
@@ -43,6 +43,7 @@ public:
         std::string line;
         int max_node = 0;
         
+        std::cout << "Component Creation"<< std::endl;
         while (std::getline(file, line)) {
             if (line.empty() || line[0] == '*' || line[0] == '#') continue;
             
@@ -94,7 +95,7 @@ public:
                         else if (token.find("Mj=") == 0) Mj = std::stod(token.substr(3));
                     }
                     
-                    std::cout << "[Diode] name=" << comp_name << " model=" << model << " n1=" << n1 << " n2=" << n2 <<" Is=" << Is << " N=" << n << " Vt=" << Vt << " Cj0=" << Cj0 << " Vj=" << Vj << " Mj=" << Mj << std::endl;
+                    std::cout << "   Diode name=" << comp_name << " model=" << model << " n1=" << n1 << " n2=" << n2 <<" Is=" << Is << " N=" << n << " Vt=" << Vt << " Cj0=" << Cj0 << " Vj=" << Vj << " Mj=" << Mj << std::endl;
                     
                     components.push_back(std::make_unique<Diode>(comp_name, n1, n2, Is, n, Vt, Cj0, Vj, Mj));
                     
@@ -142,29 +143,35 @@ public:
                     iss >> n1 >> n2 >> dcstr >> value;
                     auto vs = std::make_unique<VoltageSource>(comp_name, n1, n2, value);
                     //voltage_sources[comp_name] = vs.get();
-                    std::cout << "[VoltageSource] name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << value << std::endl;
+                    std::cout << "   VoltageSource name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << value << std::endl;
                     components.push_back(std::move(vs));
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
-                //case 'P': {
-                //    int n;
-                //    iss >> n;
-                //    std::cout << "[Probe] name=" << comp_name << " n=" << n << std::endl;
-                //    components.push_back(std::make_unique<Probe>(comp_name, n));
-                //    max_node = std::max(max_node, n);
-                //    break;
-                //}
                 case '.': {
-                    if (comp_name == ".input") {
+                    std::string directive = comp_name;
+                    if (directive == ".input") {
                         iss >> input_node;
-                    } else if (comp_name == ".output") {
+                    } else if (directive == ".output") {
                         iss >> output_node;
-                    } else if (comp_name == ".probe") {
+                    } else if (directive == ".probe") {
                         int probe_node;
                         iss >> probe_node;
                         std::cout << "Probe on node " << probe_node << std::endl;
                         probe_nodes.push_back(probe_node);
+                    } else if (directive == ".ic") {
+                        std::string cap_name;
+                        double v0;
+                        iss >> cap_name >> v0;
+
+                        // cerca il condensatore nella lista dei componenti
+                        for (auto& comp : components) {
+                            if (comp->name == cap_name && comp->type == ComponentType::CAPACITOR) {
+                                dynamic_cast<Capacitor*>(comp.get())->setInitialVoltage(v0);
+                                std::cout << "   Initial voltage set: " << cap_name << " = " << v0 << " V" << std::endl;
+                                break;
+                            }
+                        }
                     }
                     break;
                 }
@@ -174,21 +181,18 @@ public:
             }
 
         }
-        
+        std::cout << std::endl;
         num_nodes = max_node + 1;
-        
-        std::cout << "Loaded circuit: " << components.size() << " components, "
-                  << num_nodes << " nodes" << std::endl;
-        
+
         return output_node >= 0;
     }
-    
+
     void reset() {
         for (auto& comp : components) {
             comp->reset();
         }
     }
-    
+
 private:
     double parseUnit(const std::string& unit) {
         if (unit.empty()) return 1.0;

@@ -59,7 +59,8 @@
         "core": "cpp",
         "component.h": "c",
         "dense": "cpp",
-        "eigenvalues": "cpp"
+        "eigenvalues": "cpp",
+        "codecvt": "cpp"
     },
-    "C_Cpp.errorSquiggles": "enabled"
+    "C_Cpp.errorSquiggles": "disabled"
 }

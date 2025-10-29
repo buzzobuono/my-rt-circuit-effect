@@ -30,9 +30,12 @@ public:
     }
 
     void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, const Eigen::VectorXd& V, double dt) override {
-        if (dt <= 0) {
-            throw std::runtime_error("Time step must be positive");
+        
+        if (dt <= 0.0) {
+            // Caso DC: condensatore aperto
+            return;
         }
+        
         // Trapezoidal rule
         double geq = 2.0 * C / dt;          // equivalente conductance
         double ieq = geq * v_prev + i_prev; // corrente equivalente

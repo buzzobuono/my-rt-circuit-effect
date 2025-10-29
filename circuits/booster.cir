@@ -1,0 +1,29 @@
+.title Simple Booster
+
+ VCC 6 0 DC 9
+
+* BIAS NETWORK per il transistor
+Rb1 6 2 470k ; Bias superiore (da Vcc)
+Rb2 2 0 100k ; Bias inferiore (a massa)
+
+* AMPLIFICATORE A TRANSISTOR
+Q1 3 2 4 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
+*Q1 3 2 4 Q2N2222a Is=3.88184e-14 Bf=929.846 Br=48.4545 Vt=0.026
+
+* Base input (mixing con bias)
+Rb 1 2 100k ; Porta il segnale alla base
+
+* Collettore (uscita)
+Rc 6 3 5.1k ; Resistenza di collettore
+
+* Emettitore (stabilizzazione)
+Re 4 0 1k ; Resistenza di emettitore
+Ce 4 0 47u
+
+* Uscita
+C3 3 5 10u
+R3 5 0 100k
+
+.input 1
+.output 5
+*.ic C3 4.517

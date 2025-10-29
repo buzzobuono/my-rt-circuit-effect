@@ -18,30 +18,76 @@ private:
     int max_iterations;
     double tolerance;
     int input_impedance;
+    int max_non_convergence_warning;
     
+    void solveDCOperatingPoint() {
+        using namespace Eigen;
+        std::cout << "Calcolo punto di lavoro DC" << std::endl;
+
+        MatrixXd Gdc = MatrixXd::Zero(circuit.num_nodes, circuit.num_nodes);
+        VectorXd Idc = VectorXd::Zero(circuit.num_nodes);
+        // Stamp dei componenti con dt=0
+        for (auto& comp : circuit.components) {
+            comp->stamp(Gdc, Idc, VectorXd::Zero(circuit.num_nodes), 0.0);
+        }
+
+        // Nodo di massa forzato
+        Gdc(0, 0) = 1.0;
+        Idc(0) = 0.0;
+
+        // Soluzione del sistema
+        VectorXd Vdc = Gdc.lu().solve(Idc);
+        
+        // Output di debug
+        std::cout << "  Node Voltage" << std::endl;
+        for (int i = 0; i < circuit.num_nodes; ++i) {
+            std::cout << "      Nodo " << i << ": " << Vdc(i) << " V" << std::endl;
+        }
+
+        // Inizializza i condensatori
+        
+        std::cout << "  Capacitor Initialization" << std::endl;
+        for (auto& comp : circuit.components) {
+            if (comp->type == ComponentType::CAPACITOR) {
+                auto* c = dynamic_cast<Capacitor*>(comp.get());
+                if (c) {
+                    int n1 = c->nodes[0];
+                    int n2 = c->nodes[1];
+                    double v1 = (n1 > 0 && n1 < circuit.num_nodes) ? Vdc[n1] : 0.0;
+                    double v2 = (n2 > 0 && n2 < circuit.num_nodes) ? Vdc[n2] : 0.0;
+                    double v_cap = v1 - v2;
+                    c->setInitialVoltage(v_cap);
+                    std::cout << "     " << c->name << " inizializzato a " << v_cap << " V" << std::endl;
+                }
+            }
+        }
+
+        std::cout << std::endl;
+        // Copia nei voltages principali (così la simulazione parte da lì)
+        V = Vdc;
+    }
+
 public:
-    CircuitSolver(Circuit& ckt, double sample_rate, int input_impedance,
-                  int max_iter = 10, double tol = 1e-5) 
+    CircuitSolver(Circuit& ckt, double sample_rate, int input_impedance, int max_iterations = 50, double tolerance = 1e-8, int max_non_convergence_warning = 50) 
         : circuit(ckt), 
           dt(1.0 / sample_rate),
           input_impedance(input_impedance),
-          max_iterations(max_iter),
-          tolerance(tol) {
+          max_iterations(max_iterations),
+          tolerance(tolerance),
+          max_non_convergence_warning(max_non_convergence_warning) {
         
         G.resize(circuit.num_nodes, circuit.num_nodes);
         I.resize(circuit.num_nodes);
         V.resize(circuit.num_nodes);
         V.setZero();
+
+        //solveDCOperatingPoint();
     }
+
     
-    bool solve(double input_voltage) {
-        static bool first_call = true;
+    bool solve(double input_voltage, bool dc) {
+        //static bool first_call = true;
         static int sample_count = 0;
-        
-        // Set input voltage
-        //if (circuit.voltage_sources.count("VIN") > 0) {
-        //    circuit.voltage_sources["VIN"]->setVoltage(input_voltage);
-        //}
 
         // Newton-Raphson iteration
         double final_error = 0.0;
@@ -51,16 +97,16 @@ public:
             I.setZero();
             
             if (sample_count == 0 && iter == 0) {
-                std::cout << "=== Component stamping order ===" << std::endl;
-                for (size_t i = 0; i < circuit.components.size(); i++) {
-                    std::cout << i << ": " << circuit.components[i]->name 
-                            << " (type " << (int)circuit.components[i]->type << ")" 
-                            << std::endl;
-                }
+                std::cout << "Component Stamping Order" << std::endl;
             }
-            // Stamp all components
-            for (auto& comp : circuit.components) {
-                comp->stamp(G, I, V, dt);
+            for (auto& component : circuit.components) {
+                if (sample_count == 0 && iter == 0) {
+                    std::cout << "   " << component->name << std::endl;
+                }
+                component->stamp(G, I, V, dt);
+            }
+            if (sample_count == 0 && iter == 0) {
+                std::cout << std::endl;
             }
 
             double input_g = 1.0 / input_impedance;
@@ -69,14 +115,6 @@ public:
                 G(circuit.input_node, circuit.input_node) += input_g;
                 I(circuit.input_node) += input_voltage * input_g;
             }
-            // ================================================
-            
-            //std::cout << "---" << std::endl;
-            //for (size_t i = 0; i < circuit.components.size(); ++i) {
-            //    std::cout << "Component " << i << ": " 
-            //            << circuit.components[i]->name << std::endl;
-            //}
-            
             // Ground node constraint (DOPO stamp per sicurezza)
             G(0, 0) = 1.0;
             I(0) = 0.0;
@@ -88,19 +126,6 @@ public:
             double error = (V_new - V).norm();
             final_error = error;  // Salva per debug
             
-            // Debug output
-            /*if (sample_count < 5) {
-                std::cout << "Sample " << sample_count << ", Iter " << iter 
-                        << ": error = " << error << std::endl;
-                if (iter == 0) {
-                    std::cout << "  Node voltages: ";
-                    for (int i = 0; i < std::min(10, (int)V.size()); i++) {
-                        std::cout << "V[" << i << "]=" << V(i) << "V ";
-                    }
-                    std::cout << std::endl;
-                }
-            }
-            */
             // Convergence check
             if (error < tolerance) {
                 V = V_new;  // ✓ Aggiorna SOLO quando converge
@@ -110,36 +135,31 @@ public:
                     comp->updateHistory(V, dt);
                 }
                 
-                // DC operating point on first convergence
-                if (first_call) {
-                    first_call = false;
-                    std::cout << "\n=== DC Operating Point (first sample) ===" << std::endl;
+                if (dc) {
+                    //first_call = false;
+                    std::cout << "DC Operating Point" << std::endl;
                     for (int i = 0; i < circuit.num_nodes; i++) {
                         std::cout << "  Node " << i << ": " << V(i) << " V" << std::endl;
                     }
                     std::cout << "  Converged in " << (iter + 1) << " iterations" << std::endl;
-                    std::cout << "=========================================\n" << std::endl;
+                    std::cout << std::endl;
                 }
                 
                 sample_count++;
                 return true;
             }
             
-            // Update voltage guess for next iteration
             V = V_new;
         }
         
-        // Non-convergence warning
-        if (sample_count < 10) {
-            std::cerr << "WARNING: Sample " << sample_count 
-                    << " did not converge after " << max_iterations 
-                    << " iterations" << std::endl;
+        if (sample_count < max_non_convergence_warning) {
+            std::cerr << "WARNING: Sample " << sample_count << " did not converge after " << max_iterations  << " iterations" << std::endl;
             std::cerr << "  Final error: " << final_error << std::endl;
             std::cerr << "  Node voltages: ";
-            for (int i = 0; i < std::min(10, (int)V.size()); i++) {
+            for (int i = 0; i < V.size(); i++) {
                 std::cerr << "V[" << i << "]=" << V(i) << " ";
             }
-            std::cerr << std::endl;
+            std::cerr << std::endl << std::endl;
         }
         
         sample_count++;

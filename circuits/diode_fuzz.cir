@@ -12,7 +12,5 @@ D4 0 3 1N4148 Is=5.3e-9 N=1.68 Vt=0.02585 Cj0=1.15e-12 Vj=0.74 Mj=0.02
 C2 3 4 10u
 R3 4 0 10k
 
-VIN 1 0 SIGN 0.0
-.INPUT 1
-.OUTPUT 3
-.end
+.input 1
+.output 3

@@ -60,7 +60,8 @@
         "component.h": "c",
         "dense": "cpp",
         "eigenvalues": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "lu": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

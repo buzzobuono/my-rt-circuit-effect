@@ -31,12 +31,16 @@ public:
     
     virtual ~SignalProcessor() = default;
     
-    float processSample(float input, bool dc) {
+    float processSample(float input) {
         float out = 0;
-        if (solver->solve(input, dc)) {
+        if (solver->solve(input)) {
             out = solver->getOutputVoltage();
         }
         return out;
+    }
+
+    CircuitSolver* getSolver() {
+        return solver.get();
     }
     
     void reset() {

@@ -30,6 +30,8 @@ public:
     int input_node;
     int output_node;
     std::vector<int> probe_nodes;
+    double warmup_duration = 0;
+    std::map<std::string, double> initial_conditions;
 
     Circuit() : num_nodes(0), output_node(-1) {}
     
@@ -43,7 +45,7 @@ public:
         std::string line;
         int max_node = 0;
         
-        std::cout << "Component Creation"<< std::endl;
+        std::cout << "Circuit Creation"<< std::endl;
         while (std::getline(file, line)) {
             if (line.empty() || line[0] == '*' || line[0] == '#') continue;
             
@@ -55,25 +57,26 @@ public:
             
             char type = std::toupper(comp_name[0]);
             
-            
             switch(type) {
                 case 'R': {
                     int n1, n2;
-                    double value;
+                    double v;
                     std::string unit;
-                    iss >> n1 >> n2 >> value >> unit;
-                    value *= parseUnit(unit);
-                    components.push_back(std::make_unique<Resistor>(comp_name, n1, n2, value));
+                    iss >> n1 >> n2 >> v >> unit;
+                    v *= parseUnit(unit);
+                    components.push_back(std::make_unique<Resistor>(comp_name, n1, n2, v));
+                    std::cout << "   Component Resistor name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << v << std::endl;
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
                 case 'C': {
                     int n1, n2;
-                    double value;
+                    double v;
                     std::string unit;
-                    iss >> n1 >> n2 >> value >> unit;
-                    value *= parseUnit(unit);
-                    components.push_back(std::make_unique<Capacitor>(comp_name, n1, n2, value));
+                    iss >> n1 >> n2 >> v >> unit;
+                    v *= parseUnit(unit);
+                    components.push_back(std::make_unique<Capacitor>(comp_name, n1, n2, v));
+                    std::cout << "   Component Capacitor name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << v << std::endl;
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
@@ -94,11 +97,8 @@ public:
                         else if (token.find("Vj=") == 0) Vj = std::stod(token.substr(3));
                         else if (token.find("Mj=") == 0) Mj = std::stod(token.substr(3));
                     }
-                    
-                    std::cout << "   Diode name=" << comp_name << " model=" << model << " n1=" << n1 << " n2=" << n2 <<" Is=" << Is << " N=" << n << " Vt=" << Vt << " Cj0=" << Cj0 << " Vj=" << Vj << " Mj=" << Mj << std::endl;
-                    
+                    std::cout << "   Component Diode name=" << comp_name << " model=" << model << " n1=" << n1 << " n2=" << n2 <<" Is=" << Is << " N=" << n << " Vt=" << Vt << " Cj0=" << Cj0 << " Vj=" << Vj << " Mj=" << Mj << std::endl;
                     components.push_back(std::make_unique<Diode>(comp_name, n1, n2, Is, n, Vt, Cj0, Vj, Mj));
-                    
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
@@ -106,11 +106,7 @@ public:
                     int nc, nb, ne;
                     std::string model;
                     iss >> nc >> nb >> ne >> model;
-
-                    // Default parameters
                     double Is, Bf, Br, Vt;
-
-                    // Parse optional parameters
                     std::string token;
                     while (iss >> token) {
                         if (token.find("Is=") == 0)
@@ -122,7 +118,7 @@ public:
                         else if (token.find("Vt=") == 0)
                             Vt = std::stod(token.substr(3));
                     }
-
+                    std::cout << "   Component Transistor name=" << comp_name << " model=" << model << " nc=" << nc << " nb=" << nb << " ne=" << ne <<" Is=" << Is << " Bf=" << Bf << " Br=" << Br << " Vt=" << Vt << std::endl;
                     components.push_back(std::make_unique<BJT>(
                         comp_name,           // name
                         nc,                  // collector node
@@ -142,8 +138,7 @@ public:
                     double value;
                     iss >> n1 >> n2 >> dcstr >> value;
                     auto vs = std::make_unique<VoltageSource>(comp_name, n1, n2, value);
-                    //voltage_sources[comp_name] = vs.get();
-                    std::cout << "   VoltageSource name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << value << std::endl;
+                    std::cout << "   Component VoltageSource name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << value << std::endl;
                     components.push_back(std::move(vs));
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
@@ -152,26 +147,24 @@ public:
                     std::string directive = comp_name;
                     if (directive == ".input") {
                         iss >> input_node;
+                        std::cout << "   Directive Input Node: " << input_node << std::endl;
                     } else if (directive == ".output") {
                         iss >> output_node;
+                        std::cout << "   Directive Output Node: " << output_node << std::endl;
                     } else if (directive == ".probe") {
                         int probe_node;
                         iss >> probe_node;
-                        std::cout << "Probe on node " << probe_node << std::endl;
+                        std::cout << "   Directive Probe Node: " << probe_node << std::endl;
                         probe_nodes.push_back(probe_node);
+                    } else if (directive == ".warmup") {
+                        iss >> warmup_duration;
+                        std::cout << "   Directive WarmUp Duration: " << warmup_duration << "sec" << std::endl;
                     } else if (directive == ".ic") {
                         std::string cap_name;
                         double v0;
                         iss >> cap_name >> v0;
-
-                        // cerca il condensatore nella lista dei componenti
-                        for (auto& comp : components) {
-                            if (comp->name == cap_name && comp->type == ComponentType::CAPACITOR) {
-                                dynamic_cast<Capacitor*>(comp.get())->setInitialVoltage(v0);
-                                std::cout << "   Initial voltage set: " << cap_name << " = " << v0 << " V" << std::endl;
-                                break;
-                            }
-                        }
+                        initial_conditions[cap_name] = v0;
+                        std::cout << "   Directive Initial Condition: " << cap_name << " = " << v0 << " V" << std::endl;
                     }
                     break;
                 }
@@ -185,6 +178,35 @@ public:
         num_nodes = max_node + 1;
 
         return output_node >= 0;
+    }
+
+    bool hasInitialConditions() const {
+        return !initial_conditions.empty();
+    }
+    
+    bool hasWarmUp() const {
+        return warmup_duration > 0;
+    }
+
+    void applyInitialConditions() {
+        std::cout << "Initial Conditions apply" << std::endl;
+        if (initial_conditions.empty()) {
+            std::cout << "   No initial conditions to apply" << std::endl;;
+            return;
+        }
+        
+        for (auto& comp : components) {
+            if (comp->type == ComponentType::CAPACITOR) {
+                auto* cap = dynamic_cast<Capacitor*>(comp.get());
+                if (cap && initial_conditions.count(cap->name)) {
+                    double v0 = initial_conditions[cap->name];
+                    cap->setInitialVoltage(v0);
+                    std::cout << "   " << cap->name << " = " << v0 << " V" << std::endl;
+                }
+            }
+        }
+        
+        std::cout << std::endl;
     }
 
     void reset() {

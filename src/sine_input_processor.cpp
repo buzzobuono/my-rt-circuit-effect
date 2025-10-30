@@ -49,7 +49,7 @@ public:
             double t = i / sample_rate;
             float voltage_in = amplitude * std::sin(2.0 * M_PI * frequency * t);
 
-            float voltage_out = processor.processSample(voltage_in, false);
+            float voltage_out = processor.processSample(voltage_in);
 
             // Handle numerical issues
             if (std::isnan(voltage_out) || std::isinf(voltage_out))

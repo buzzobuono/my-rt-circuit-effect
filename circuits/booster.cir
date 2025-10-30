@@ -27,3 +27,4 @@ R3 5 0 100k
 .input 1
 .output 5
 *.ic C3 4.517
+.warmup 10

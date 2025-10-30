@@ -39,7 +39,7 @@ public:
 
     bool process(const std::string &input_file, const std::string &output_file)
     {
-        // Apri WAV
+        // Open Input WAV
         SF_INFO sfInfo;
         sfInfo.format = 0;
         SNDFILE* file = sf_open(input_file.c_str(), SFM_READ, &sfInfo);
@@ -50,7 +50,7 @@ public:
         }
         
         std::cout << "Input File Format" << std::endl;
-        printFileFormat(sfInfo);
+        printFileFormat(input_file);
 
         if (sample_rate) sample_rate = sfInfo.samplerate;
         
@@ -98,13 +98,7 @@ public:
 
         for (size_t i = 0; i < signalIn.size(); i++) {
             if (!bypass) {
-                //signalOut[i] = processor.processSample(signalIn[i], false);
-                if(i == (signalIn.size() - 1)) {
-                    // print DC only for the last sample
-                    signalOut[i] = processor.processSample(signalIn[i], true);
-                } else {
-                    signalOut[i] = processor.processSample(signalIn[i], false);
-                }
+                signalOut[i] = processor.processSample(signalIn[i]);
             } else {
                 signalOut[i] = signalIn[i];
             }
@@ -123,6 +117,8 @@ public:
             outputPeak = std::max(outputPeak, std::abs(v));
         }
 
+        processor.getSolver()->printDCOperatingPoint();
+
         // Print statistics
         std::cout << "Audio Statistics:" << std::endl;
         std::cout << "  Mean Input Signal " << mean << std::endl;
@@ -132,12 +128,12 @@ public:
         std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
         std::cout << std::endl;
 
-        writeWav(signalOut, output_file.c_str(), sample_rate);
+        writeWav(signalOut, output_file, sample_rate);
         return true;
     }
 
     bool writeWav(std::vector<float> signalOut,
-              const char* output_file,
+              const std::string& output_file,
               int sample_rate,
               int bitDepth = 24) {
         
@@ -161,7 +157,7 @@ public:
         }
         
         // Scrivi WAV
-        SNDFILE* file = sf_open(output_file, SFM_WRITE, &sfInfo);
+        SNDFILE* file = sf_open(output_file.c_str(), SFM_WRITE, &sfInfo);
         if (!file) {
             std::cerr << "Errore apertura WAV: " << sf_strerror(file) << std::endl;
             return false;
@@ -178,12 +174,17 @@ public:
         std::cout << "Output File Format" << std::endl;
         std::cout << "   File Name: " << output_file << std::endl;
         std::cout << "   Duration: " << (float)signalOut.size() / sample_rate << " sec" << std::endl;
-        printFileFormat(sfInfo);
+        
+        printFileFormat(output_file);
         
         return true;
     }
 
-    void printFileFormat(SF_INFO sfInfo) {
+    void printFileFormat(const std::string &file) {
+        SF_INFO sfInfo;
+        sfInfo.format = 0;
+        SNDFILE* sound_file = sf_open(file.c_str(), SFM_READ, &sfInfo);
+        sf_close(sound_file);
         std::cout << "   Canali: " << sfInfo.channels << std::endl;
         std::cout << "   Sample rate: " << sfInfo.samplerate << " Hz" << std::endl;
         std::cout << "   Frames: " << sfInfo.frames << std::endl;
@@ -231,7 +232,7 @@ int main(int argc, char *argv[]) {
 
     app.add_option("-i,--input", input_file, "File di input")->default_val(input_file)->check(CLI::ExistingFile);
     app.add_option("-o,--output", output_file, "File di output")->default_val(output_file);
-    app.add_option("-n,--netlist", netlist_file, "Netlist file")->default_val(netlist_file)->check(CLI::ExistingFile);
+    app.add_option("-c,--circuit", netlist_file, "Netlist file")->default_val(netlist_file)->check(CLI::ExistingFile);
     app.add_option("-v,--max-input-voltage", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(0.15);
     app.add_option("-I,--input-impedance", input_impedance, "Input Impedance")->check(CLI::Range(0, 30000))->default_val(25000);
     app.add_flag("-b,--bypass", bypass, "Bypass Circuit")->default_val(false);
@@ -240,12 +241,12 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Input Parameters" << std::endl;
     std::cout << std::left;
-    std::cout << "   Input file:" << input_file << std::endl;
-    std::cout << "   Output file:" << output_file << std::endl;
-    std::cout << "   Netlist file:" << netlist_file << std::endl;
-    std::cout << "   Max Input Voltage:" << max_input_voltage << " V" << std::endl;
-    std::cout << "   Input Impedance:" << input_impedance << " Ω" << std::endl;
-    std::cout << "   Bypass Circuit:" << (bypass ? "Yes" : "No") << std::endl;
+    std::cout << "   Input file: " << input_file << std::endl;
+    std::cout << "   Output file: " << output_file << std::endl;
+    std::cout << "   Netlist file: " << netlist_file << std::endl;
+    std::cout << "   Max Input Voltage :" << max_input_voltage << " V" << std::endl;
+    std::cout << "   Input Impedance: " << input_impedance << " Ω" << std::endl;
+    std::cout << "   Bypass Circuit: " << (bypass ? "True" : "False") << std::endl;
     std::cout << std::endl;
 
     try {
@@ -275,75 +276,3 @@ int main(int argc, char *argv[]) {
     
 }
 
-int main__(int argc, char *argv[])
-{
-    if (argc < 6)
-    {
-        std::cerr << "=== Pedal Circuit Simulator ===" << std::endl;
-        std::cerr << "Usage: " << argv[0]
-                  << " <input.wav> <output.wav> <circuit.cir> <input voltage max[V]> <input_impedance[Ohm]> <bypass[true|false]"
-                  << std::endl;
-        std::cerr << "\n=== Examples ===" << std::endl;
-        std::cerr << "  Gibson Les Paul:     " << argv[0]
-                  << " guitar.wav out.wav buffer.cir 0.15 15000" << std::endl;
-        std::cerr << "  Fender Stratocaster: " << argv[0]
-                  << " guitar.wav out.wav buffer.cir 0.10 10000" << std::endl;
-        std::cerr << "  Precision Bass:      " << argv[0]
-                  << " bass.wav out.wav buffer.cir 0.20 20000" << std::endl;
-        std::cerr << "  StingRay Active:     " << argv[0]
-                  << " bass.wav out.wav buffer.cir 0.50 600" << std::endl;
-
-        std::cerr << "\n=== Instrument Parameters ===" << std::endl;
-        std::cerr << "  input voltage max - Peak voltage from instrument (Volts)" << std::endl;
-        std::cerr << "  source_impedance  - Output impedance of instrument (Ohms)" << std::endl;
-        std::cerr << "  bypass            - By Pass circuit" << std::endl;
-        return 1;
-    }
-
-    std::string input_file = argv[1];
-    std::string output_file = argv[2];
-    std::string netlist_file = argv[3];
-    float input_voltage_max = std::atof(argv[4]);
-    int input_impedance = std::atoi(argv[5]);
-    int bypass = std::atoi(argv[6]);
-
-    // Validation
-    if (input_voltage_max <= 0 || input_voltage_max > 5)
-    {
-        std::cerr << "Error: input_voltage_max must be between 0 and 5V" << std::endl;
-        return 1;
-    }
-    if (input_impedance <= 0 || input_impedance > 30000)
-    {
-        std::cerr << "Error: input_impedance must be between 0 and 30k" << std::endl;
-        return 1;
-    }
-
-    try
-    {
-        // Get sample rate from input file
-        SF_INFO sf_info;
-        std::memset(&sf_info, 0, sizeof(sf_info));
-        SNDFILE *tmp = sf_open(input_file.c_str(), SFM_READ, &sf_info);
-        if (!tmp)
-        {
-            std::cerr << "Cannot open input file: " << input_file << std::endl;
-            return 1;
-        }
-        double sample_rate = sf_info.samplerate;
-        sf_close(tmp);
-
-        WavFileProcessor processor(netlist_file, sample_rate, input_voltage_max, input_impedance, bypass);
-        if (!processor.process(input_file, output_file))
-        {
-            return 1;
-        }
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << "Error: " << e.what() << std::endl;
-        return 1;
-    }
-
-    return 0;
-}

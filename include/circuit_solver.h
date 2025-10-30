@@ -10,6 +10,7 @@
 #include "circuit.h"
 
 class CircuitSolver {
+
 private:
     Circuit& circuit;
     Eigen::MatrixXd G;
@@ -19,10 +20,56 @@ private:
     double tolerance;
     int input_impedance;
     int max_non_convergence_warning;
+
+    bool warmUp(double warmup_duration) {
+        std::cout << "Circuit WarmUp" << std::endl;
+        int warmup_samples = static_cast<int>(warmup_duration / dt);
+        for (int i = 0; i < warmup_samples; i++) {
+            if (!solve(0.0)) {
+                std::cerr << "   WarmUp sample " << i << " convergence issue" << std::endl;
+                return 1;
+            }
+        }
+        std::cout << "   Circuit stabilized after " << (warmup_samples * dt * 1000) << " ms" << std::endl;
+        std::cout << std::endl;
+        return 0;
+    }
+
     
-    void solveDCOperatingPoint() {
+    
+public:
+    CircuitSolver(Circuit& ckt, double sample_rate, int input_impedance, int max_iterations = 50, double tolerance = 1e-8, int max_non_convergence_warning = 50) 
+        : circuit(ckt), 
+          dt(1.0 / sample_rate),
+          input_impedance(input_impedance),
+          max_iterations(max_iterations),
+          tolerance(tolerance),
+          max_non_convergence_warning(max_non_convergence_warning) {
+        
+        G.resize(circuit.num_nodes, circuit.num_nodes);
+        I.resize(circuit.num_nodes);
+        V.resize(circuit.num_nodes);
+        V.setZero();
+
+        //solveDCOperatingPoint();
+
+        if (circuit.hasInitialConditions()) {
+            circuit.applyInitialConditions();
+        }
+        if (circuit.hasWarmUp()) {
+            warmUp(circuit.warmup_duration);
+        }
+        if (!circuit.hasInitialConditions() && !circuit.hasWarmUp() ) {
+            std::cout << "Starting from zero state" << std::endl;
+            std::cout << std::endl;
+        }
+
+        printDCOperatingPoint();
+    }
+
+    bool solveDC() {
         using namespace Eigen;
-        std::cout << "Calcolo punto di lavoro DC" << std::endl;
+        std::cout << "DC S punto di lavoro DC" << std::endl;
 
         MatrixXd Gdc = MatrixXd::Zero(circuit.num_nodes, circuit.num_nodes);
         VectorXd Idc = VectorXd::Zero(circuit.num_nodes);
@@ -65,28 +112,10 @@ private:
         std::cout << std::endl;
         // Copia nei voltages principali (così la simulazione parte da lì)
         V = Vdc;
+        return true;
     }
 
-public:
-    CircuitSolver(Circuit& ckt, double sample_rate, int input_impedance, int max_iterations = 50, double tolerance = 1e-8, int max_non_convergence_warning = 50) 
-        : circuit(ckt), 
-          dt(1.0 / sample_rate),
-          input_impedance(input_impedance),
-          max_iterations(max_iterations),
-          tolerance(tolerance),
-          max_non_convergence_warning(max_non_convergence_warning) {
-        
-        G.resize(circuit.num_nodes, circuit.num_nodes);
-        I.resize(circuit.num_nodes);
-        V.resize(circuit.num_nodes);
-        V.setZero();
-
-        //solveDCOperatingPoint();
-    }
-
-    
-    bool solve(double input_voltage, bool dc) {
-        //static bool first_call = true;
+    bool solve(double input_voltage) {
         static int sample_count = 0;
 
         // Newton-Raphson iteration
@@ -96,17 +125,8 @@ public:
             G.setZero();
             I.setZero();
             
-            if (sample_count == 0 && iter == 0) {
-                std::cout << "Component Stamping Order" << std::endl;
-            }
-            for (auto& component : circuit.components) {
-                if (sample_count == 0 && iter == 0) {
-                    std::cout << "   " << component->name << std::endl;
-                }
+            for (auto& component : circuit.components) {   
                 component->stamp(G, I, V, dt);
-            }
-            if (sample_count == 0 && iter == 0) {
-                std::cout << std::endl;
             }
 
             double input_g = 1.0 / input_impedance;
@@ -134,17 +154,6 @@ public:
                 for (auto& comp : circuit.components) {
                     comp->updateHistory(V, dt);
                 }
-                
-                if (dc) {
-                    //first_call = false;
-                    std::cout << "DC Operating Point" << std::endl;
-                    for (int i = 0; i < circuit.num_nodes; i++) {
-                        std::cout << "  Node " << i << ": " << V(i) << " V" << std::endl;
-                    }
-                    std::cout << "  Converged in " << (iter + 1) << " iterations" << std::endl;
-                    std::cout << std::endl;
-                }
-                
                 sample_count++;
                 return true;
             }
@@ -171,15 +180,14 @@ public:
         return V(circuit.output_node);
     }
     
-    // Get any node voltage (for debugging/analysis)
-    double getNodeVoltage(int node) const {
-        if (node >= 0 && node < circuit.num_nodes) {
-            return V(node);
+    void printDCOperatingPoint() {
+        std::cout << "DC Operating Point" << std::endl;
+        for (int i = 0; i < circuit.num_nodes; i++) {
+            std::cout << "  Node " << i << ": " << V(i) << " V" << std::endl;
         }
-        return 0.0;
+        std::cout << std::endl;
     }
-    
-    // Reset state
+
     void reset() {
         V.setZero();
         circuit.reset();

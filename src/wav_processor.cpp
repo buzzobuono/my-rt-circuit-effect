@@ -4,37 +4,46 @@
 #include <vector>
 #include <string>
 #include <sndfile.h>
+
 #include "external/CLI11.hpp"
-#include "signal_processor.h"
+
+#include "circuit.h"
+#include "circuit_solver.h"
 
 class WavFileProcessor
 {
 private:
-    SignalProcessor processor;
+    Circuit circuit;
+    std::unique_ptr<CircuitSolver> solver;
     double sample_rate;
-    float input_voltage_max;
+    float max_input_voltage;
     int input_impedance;
     bool bypass;
 
 public:
-    WavFileProcessor(const std::string &netlist,
+    WavFileProcessor(const std::string &netlist_file,
                      double sample_rate,
-                     float input_voltage_max,
+                     float max_input_voltage,
                      int input_impedance,
                      bool bypass
                     )
-        : processor(netlist, sample_rate, input_impedance),
-          sample_rate(sample_rate),
-          input_voltage_max(input_voltage_max),
+        : sample_rate(sample_rate),
+          max_input_voltage(max_input_voltage),
           input_impedance(input_impedance),
           bypass(bypass)
     {
         std::cout << "Audio scaling configuration" << std::endl;
-        std::cout << "  Input Voltage Max: " << input_voltage_max << std::endl;
+        std::cout << "  Input Voltage Max: " << max_input_voltage << std::endl;
         std::cout << "  Input Input Impedance: " << input_impedance << std::endl;
         std::cout << "  Sample rate: " << sample_rate << " Hz" << std::endl;
         std::cout << "  Circuit By Pass: " << bypass << std::endl;
         std::cout << std::endl;
+
+        if (!circuit.loadNetlist(netlist_file)) {
+            throw std::runtime_error("Failed to load netlist");
+        }
+        
+        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance);
     }
 
     bool process(const std::string &input_file, const std::string &output_file)
@@ -85,7 +94,7 @@ public:
         
         float scale = 1;
         if (maxNormalized > 1e-10f) {
-            scale = input_voltage_max / maxNormalized;
+            scale = max_input_voltage / maxNormalized;
         }
 
         for (float& s : signalIn) s *= scale;
@@ -98,7 +107,10 @@ public:
 
         for (size_t i = 0; i < signalIn.size(); i++) {
             if (!bypass) {
-                signalOut[i] = processor.processSample(signalIn[i]);
+                signalOut[i] = 0;
+                if (solver->solve(signalIn[i])) {
+                    signalOut[i] = solver->getOutputVoltage();
+                }
             } else {
                 signalOut[i] = signalIn[i];
             }
@@ -117,7 +129,7 @@ public:
             outputPeak = std::max(outputPeak, std::abs(v));
         }
 
-        processor.getSolver()->printDCOperatingPoint();
+        solver->printDCOperatingPoint();
 
         // Print statistics
         std::cout << "Audio Statistics:" << std::endl;

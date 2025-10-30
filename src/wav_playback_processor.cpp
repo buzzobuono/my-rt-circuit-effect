@@ -8,35 +8,30 @@
 #include <sndfile.h>
 #include <portaudio.h>
 #include "external/CLI11.hpp"
-
 #include "signal_processor.h"
 
-// =============================================================
-// Classe che legge un WAV, lo elabora con SignalProcessor e lo riproduce
-// =============================================================
-class WavPlaybackProcessor {
+class WavStreamingProcessor {
 private:
-    
     Circuit circuit;
     std::unique_ptr<CircuitSolver> solver;
     double sample_rate;
     int input_impedance;
 
 public:
-    WavPlaybackProcessor(const std::string& netlist_file,
-                     double sample_rate,
-                     int input_impedance)
+    WavStreamingProcessor(const std::string& netlist_file,
+                          double sample_rate,
+                          int input_impedance)
         : sample_rate(sample_rate),
           input_impedance(input_impedance)
     {
         if (!circuit.loadNetlist(netlist_file)) {
             throw std::runtime_error("Failed to load netlist");
         }
-        
+
         solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance);
     }
 
-    bool process(const std::string& input_file, const std::string& output_file) {
+    bool processAndPlay(const std::string& input_file) {
         SF_INFO sfinfo;
         std::memset(&sfinfo, 0, sizeof(sfinfo));
 
@@ -46,91 +41,91 @@ public:
             return false;
         }
 
-        std::vector<float> samples(sfinfo.frames * sfinfo.channels);
-        sf_readf_float(infile, samples.data(), sfinfo.frames);
-        sf_close(infile);
-
-        std::cout << "WAV Playback Processor\n";
+        std::cout << "WAV Streaming Processor\n";
         std::cout << "  Input: " << input_file << "\n";
         std::cout << "  Sample rate: " << sfinfo.samplerate << " Hz\n";
         std::cout << "  Canali: " << sfinfo.channels << "\n";
-        std::cout << "  Frame totali: " << sfinfo.frames << "\n";
         std::cout << std::endl;
-    
-        for (size_t i = 0; i < samples.size(); ++i) {
-            float vin = samples[i];
-            float vout = 0;
-            if (solver->solve(vin)) {
-                vout = solver->getOutputVoltage();
-            }
-            if (std::isnan(vout) || std::isinf(vout))
-                vout = 0.0f;
-            samples[i] = vout;
-        }
-    
-        // Scrive su file di output
-        SNDFILE* outfile = sf_open(output_file.c_str(), SFM_WRITE, &sfinfo);
-        if (!outfile) {
-            std::cerr << "Errore creazione file di output: " << sf_strerror(nullptr) << "\n";
-            return false;
-        }
-        sf_writef_float(outfile, samples.data(), sfinfo.frames);
-        sf_close(outfile);
 
-        std::cout << "✓ File processato salvato in: " << output_file << "\n";
-
-        // Riproduzione (opzionale)
-        play(samples, sfinfo.samplerate, sfinfo.channels);
-
-        return true;
-    }
-
-private:
-    // Funzione per riprodurre con PortAudio
-    void play(const std::vector<float>& samples, int sample_rate, int channels) {
+        // Inizializza PortAudio
         PaError err = Pa_Initialize();
         if (err != paNoError) {
             std::cerr << "Errore PortAudio: " << Pa_GetErrorText(err) << "\n";
-            return;
+            sf_close(infile);
+            return false;
         }
 
         PaStream* stream;
         err = Pa_OpenDefaultStream(&stream,
-                                   0,
-                                   channels,
+                                   0, // nessun input
+                                   sfinfo.channels,
                                    paFloat32,
-                                   sample_rate,
-                                   256,
+                                   sfinfo.samplerate,
+                                   256, // dimensione del buffer
                                    nullptr,
                                    nullptr);
 
         if (err != paNoError) {
             std::cerr << "Errore apertura stream: " << Pa_GetErrorText(err) << "\n";
             Pa_Terminate();
-            return;
+            sf_close(infile);
+            return false;
         }
 
         Pa_StartStream(stream);
-        Pa_WriteStream(stream, samples.data(), samples.size() / channels);
+
+        constexpr size_t BUFFER_SIZE = 512; // frames per batch
+        std::vector<float> buffer(BUFFER_SIZE * sfinfo.channels);
+
+        sf_count_t readcount;
+        while ((readcount = sf_readf_float(infile, buffer.data(), BUFFER_SIZE)) > 0) {
+            // Processa il buffer
+            for (size_t i = 0; i < static_cast<size_t>(readcount * sfinfo.channels); ++i) {
+                float vin = buffer[i];
+                float vout = 0.0f;
+
+                if (solver->solve(vin)) {
+                    vout = solver->getOutputVoltage();
+                }
+
+                if (std::isnan(vout) || std::isinf(vout))
+                    vout = 0.0f;
+
+                buffer[i] = vout;
+            }
+
+            // Scrivi sullo stream audio
+            err = Pa_WriteStream(stream, buffer.data(), readcount);
+            if (err != paNoError) {
+                std::cerr << "Errore scrittura stream: " << Pa_GetErrorText(err) << "\n";
+                break;
+            }
+        }
+
+        // Chiude tutto
         Pa_StopStream(stream);
         Pa_CloseStream(stream);
         Pa_Terminate();
+        sf_close(infile);
+
+        std::cout << "✓ Riproduzione completata.\n";
+        return true;
     }
 };
 
+// =============================================================
+// MAIN
+// =============================================================
 int main(int argc, char* argv[]) {
-    CLI::App app{"Pedal Circuit Simulator — WAV Processor"};
+    CLI::App app{"Pedal Circuit Simulator — WAV Streaming Player"};
 
     std::string input_file = "input.wav";
-    std::string output_file = "output.wav";
     std::string netlist_file;
     int input_impedance;
 
     app.add_option("-i,--input", input_file, "File di input WAV")
         ->check(CLI::ExistingFile)
         ->default_val(input_file);
-    app.add_option("-o,--output", output_file, "File di output WAV")
-        ->default_val(output_file);
     app.add_option("-c,--circuit", netlist_file, "Netlist del circuito SPICE")
         ->check(CLI::ExistingFile)
         ->required();
@@ -142,13 +137,11 @@ int main(int argc, char* argv[]) {
 
     std::cout << "=== Parametri ===\n";
     std::cout << "Input: " << input_file << "\n";
-    std::cout << "Output: " << output_file << "\n";
     std::cout << "Circuito: " << netlist_file << "\n";
     std::cout << "Input Impedance: " << input_impedance << " Ω\n";
     std::cout << std::endl;
 
     try {
-        // Determina il sample rate dal file
         SF_INFO sf_info;
         std::memset(&sf_info, 0, sizeof(sf_info));
         SNDFILE* tmp = sf_open(input_file.c_str(), SFM_READ, &sf_info);
@@ -159,9 +152,8 @@ int main(int argc, char* argv[]) {
         double sample_rate = sf_info.samplerate;
         sf_close(tmp);
 
-        // Esegui il processore
-        WavPlaybackProcessor processor(netlist_file, sample_rate, input_impedance);
-        if (!processor.process(input_file, output_file))
+        WavStreamingProcessor processor(netlist_file, sample_rate, input_impedance);
+        if (!processor.processAndPlay(input_file))
             return 1;
 
     } catch (const std::exception& e) {

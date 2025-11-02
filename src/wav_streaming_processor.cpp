@@ -106,6 +106,8 @@ public:
         constexpr size_t BUFFER_SIZE = 128;
         std::vector<float> buffer(BUFFER_SIZE * sfinfo.channels);
 
+        solver->initialize();
+        
         bool running = true;
         setNonBlocking(true);
         std::thread inputThread([&]() {
@@ -218,7 +220,7 @@ int main(int argc, char* argv[]) {
         ->default_val(25000);
 
     CLI11_PARSE(app, argc, argv);
-
+    
     try {
         SF_INFO sf_info;
         std::memset(&sf_info, 0, sizeof(sf_info));

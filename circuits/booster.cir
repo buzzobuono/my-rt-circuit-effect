@@ -1,6 +1,6 @@
-.title Simple Booster
+.title Simple Booster with Volume Control
 
- VCC 6 0 DC 9
+VCC 6 0 DC 9
 
 * BIAS NETWORK per il transistor
 Rb1 6 2 470k ; Bias superiore (da Vcc)
@@ -20,11 +20,14 @@ Rc 6 3 5.1k ; Resistenza di collettore
 Re 4 0 1k ; Resistenza di emettitore
 Ce 4 0 47u
 
-* Uscita
+* Uscita (5)
 C3 3 5 10u
 R3 5 0 100k
 
+Pvol 0 7 5 100k 1 LOG
+
 .input 1
-.output 5
+.output 7
 *.ic C3 4.517
-.warmup 10
+.warmup 50
+*.param 1 Pvol

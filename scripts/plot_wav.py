@@ -35,5 +35,5 @@ plt.tight_layout()
 plt.show()
 
 print(f"Durata: {time[-1]:.2f} secondi")
-print(f"Sample rate: {sample_rate} Hz")
+print(f"Sample Rate: {sample_rate} Hz")
 print(f"Numero di campioni: {len(channel_1)}")

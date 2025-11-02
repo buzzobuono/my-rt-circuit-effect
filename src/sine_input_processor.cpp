@@ -30,7 +30,7 @@ public:
     {
         std::cout << "=== Sine Test Signal Generator ===" << std::endl;
         std::cout << "  Amplitude: ±" << amplitude << " V" << std::endl;
-        std::cout << "  Sample rate: " << sample_rate << " Hz" << std::endl;
+        std::cout << "  Sample Rate: " << sample_rate << " Hz" << std::endl;
         std::cout << "  Frequency: " << frequency << " Hz" << std::endl;
         std::cout << "  Duration:  " << duration << " s" << std::endl;
     }

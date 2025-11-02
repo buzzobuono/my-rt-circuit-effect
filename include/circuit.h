@@ -19,6 +19,7 @@
 #include "components/diode.h"
 #include "components/bjt.h"
 #include "components/mosfet.h"
+#include "components/potentiometer.h"
 
 #include <Eigen/Dense>
 #include <Eigen/LU>  
@@ -32,6 +33,8 @@ public:
     std::vector<int> probe_nodes;
     double warmup_duration = 0;
     std::map<std::string, double> initial_conditions;
+    std::vector<std::pair<int, std::string>> pending_params;
+    std::map<int, Potentiometer*> param_map;
 
     Circuit() : num_nodes(0), output_node(-1) {}
     
@@ -143,6 +146,27 @@ public:
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
+                case 'P': {
+                    int n1, n2, nw;
+                    double r_total, pos;
+                    std::string taper_str, unit;
+                    // P1 1 2 3 10k 0.5 LOG
+                    iss >> n1 >> n2 >> nw >> r_total >> unit >> pos >> taper_str;
+                    r_total *= parseUnit(unit);
+
+                    Potentiometer::TaperType taper = Potentiometer::TaperType::LINEAR;
+                    std::transform(taper_str.begin(), taper_str.end(), taper_str.begin(), ::toupper);
+                    if (taper_str == "LOG" || taper_str == "A")
+                        taper = Potentiometer::TaperType::LOGARITHMIC;
+                    else if (taper_str == "LIN" || taper_str == "B")
+                        taper = Potentiometer::TaperType::LINEAR;
+                    else
+                        std::cerr << "   Warning: Potentiometer taper '" << taper_str << "' not recognized, using LINEAR" << std::endl;
+                    components.push_back(std::make_unique<Potentiometer>(comp_name, n1, n2, nw, r_total, pos, taper));
+                    std::cout << "   Component Potentiometer name=" << comp_name << " n1=" << n1 << " n2=" << n2 << " nw=" << nw << " Rtot=" << r_total << " pos=" << pos << " taper=" << taper_str << std::endl;
+                    max_node = std::max({max_node, n1, n2, nw});
+                    break;
+                }
                 case '.': {
                     std::string directive = comp_name;
                     if (directive == ".input") {
@@ -165,6 +189,12 @@ public:
                         iss >> cap_name >> v0;
                         initial_conditions[cap_name] = v0;
                         std::cout << "   Directive Initial Condition: " << cap_name << " = " << v0 << " V" << std::endl;
+                    } else if (directive == ".param") {
+                        int id;
+                        std::string comp_name;
+                        iss >> id >> comp_name;
+                        pending_params.push_back({id, comp_name});
+                        std::cout << "   Directive Param: id=" << id << " comp=" << comp_name << std::endl;
                     }
                     break;
                 }
@@ -175,7 +205,27 @@ public:
 
         }
         std::cout << std::endl;
+
         num_nodes = max_node + 1;
+
+        std::cout << "Linked Params"<< std::endl;
+        for (auto& [id, comp_name] : pending_params) {
+        bool found = false;
+        for (auto& comp : components) {
+            if (comp->name == comp_name) {
+                auto* pot = dynamic_cast<Potentiometer*>(comp.get());
+                if (!pot)
+                    throw std::runtime_error(".param refers to non-potentiometer: " + comp_name);
+                param_map[id] = pot;
+                found = true;
+                std::cout << "   Link Component " << comp_name << " on Param Id " << id << std::endl;
+                break;
+            }
+        }
+        if (!found)
+            throw std::runtime_error("   .param component not found: " + comp_name);
+        std::cout << std::endl;
+    }
 
         return output_node >= 0;
     }
@@ -207,6 +257,15 @@ public:
         }
         
         std::cout << std::endl;
+    }
+
+    void setParam(int id, double value) {
+        auto it = param_map.find(id);
+        if (it == param_map.end())
+            throw std::runtime_error("Parameter ID not found: " + std::to_string(id));
+        
+        it->second->setPosition(value);
+        std::cout << "   Parameter " << id << " (" << it->second->name << ") set to " << value << std::endl;
     }
 
     void reset() {

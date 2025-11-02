@@ -57,5 +57,5 @@ plt.show()
 duration = len(data1) / sr1
 peak_idx = np.argmax(mag1)
 print(f"Durata: {duration:.2f} s")
-print(f"Sample rate: {sr1} Hz")
+print(f"Sample Rate: {sr1} Hz")
 print(f"Frequenza di picco (output): {freqs1[peak_idx]:.2f} Hz")

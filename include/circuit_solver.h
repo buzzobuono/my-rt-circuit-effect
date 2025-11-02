@@ -183,7 +183,7 @@ public:
     void printDCOperatingPoint() {
         std::cout << "DC Operating Point" << std::endl;
         for (int i = 0; i < circuit.num_nodes; i++) {
-            std::cout << "  Node " << i << ": " << V(i) << " V" << std::endl;
+            std::cout << "   Node " << i << ": " << V(i) << " V" << std::endl;
         }
         std::cout << std::endl;
     }

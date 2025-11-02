@@ -7,9 +7,7 @@
 
 enum class ComponentType {
     RESISTOR, CAPACITOR, INDUCTOR,
-    DIODE, BJT,
-    VOLTAGE_SOURCE,
-    PROBE
+    DIODE, BJT, VOLTAGE_SOURCE, POTENTIOMETER
 };
 
 class Component {

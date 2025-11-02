@@ -6,7 +6,7 @@ import csv
 parser = argparse.ArgumentParser(description="Analizza lo spettro di uno o due file CSV (prima/dopo il filtro).")
 parser.add_argument("csv_file", help="File CSV da analizzare (es. output filtrato)")
 parser.add_argument("--compare", help="File CSV originale per confronto", default=None)
-parser.add_argument("--sr", type=float, required=True, help="Sample rate in Hz")
+parser.add_argument("--sr", type=float, required=True, help="Sample Rate in Hz")
 parser.add_argument("--fc", type=float, help="Frequenza di taglio prevista (Hz)", default=None)
 args = parser.parse_args()
 
@@ -73,5 +73,5 @@ plt.show()
 duration = len(data1) / args.sr
 peak_idx = np.argmax(mag1)
 print(f"Durata: {duration:.2f} s")
-print(f"Sample rate: {args.sr} Hz")
+print(f"Sample Rate: {args.sr} Hz")
 print(f"Frequenza di picco (output): {freqs1[peak_idx]:.2f} Hz")

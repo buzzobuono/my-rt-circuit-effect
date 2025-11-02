@@ -32,13 +32,6 @@ public:
           input_impedance(input_impedance),
           bypass(bypass)
     {
-        std::cout << "Audio scaling configuration" << std::endl;
-        std::cout << "  Input Voltage Max: " << max_input_voltage << std::endl;
-        std::cout << "  Input Input Impedance: " << input_impedance << std::endl;
-        std::cout << "  Sample rate: " << sample_rate << " Hz" << std::endl;
-        std::cout << "  Circuit By Pass: " << bypass << std::endl;
-        std::cout << std::endl;
-
         if (!circuit.loadNetlist(netlist_file)) {
             throw std::runtime_error("Failed to load netlist");
         }
@@ -198,7 +191,7 @@ public:
         SNDFILE* sound_file = sf_open(file.c_str(), SFM_READ, &sfInfo);
         sf_close(sound_file);
         std::cout << "   Canali: " << sfInfo.channels << std::endl;
-        std::cout << "   Sample rate: " << sfInfo.samplerate << " Hz" << std::endl;
+        std::cout << "   Sample Rate: " << sfInfo.samplerate << " Hz" << std::endl;
         std::cout << "   Frames: " << sfInfo.frames << std::endl;
         std::cout << "   Formato numerico (bitmask): 0x" << std::hex << sfInfo.format << std::dec << std::endl;
 

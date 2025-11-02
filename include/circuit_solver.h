@@ -50,9 +50,9 @@ public:
         I.resize(circuit.num_nodes);
         V.resize(circuit.num_nodes);
         V.setZero();
-
-        //solveDCOperatingPoint();
-
+    }
+    
+    bool initialize() {
         if (circuit.hasInitialConditions()) {
             circuit.applyInitialConditions();
         }
@@ -65,55 +65,88 @@ public:
         }
 
         printDCOperatingPoint();
+        
+        return true;
     }
-
+    
     bool solveDC() {
-        using namespace Eigen;
-        std::cout << "DC S punto di lavoro DC" << std::endl;
+    using namespace Eigen;
+    std::cout << "Calcolo punto di lavoro DC" << std::endl;
 
-        MatrixXd Gdc = MatrixXd::Zero(circuit.num_nodes, circuit.num_nodes);
-        VectorXd Idc = VectorXd::Zero(circuit.num_nodes);
-        // Stamp dei componenti con dt=0
+    MatrixXd Gdc = MatrixXd::Zero(circuit.num_nodes, circuit.num_nodes);
+    VectorXd Idc = VectorXd::Zero(circuit.num_nodes);
+    
+    // Iterazione Newton-Raphson per componenti non lineari
+    VectorXd Vdc = VectorXd::Zero(circuit.num_nodes);
+    
+    for (int iter = 0; iter < max_iterations; iter++) {
+        Gdc.setZero();
+        Idc.setZero();
+        
+        // Stamp dei componenti con dt=infinito (DC)
+        // Per l'analisi DC:
+        // - Condensatori = circuito aperto (non contribuiscono)
+        // - Induttori = cortocircuito (contribuiscono come resistenze con R=0)
         for (auto& comp : circuit.components) {
-            comp->stamp(Gdc, Idc, VectorXd::Zero(circuit.num_nodes), 0.0);
+            if (comp->type == ComponentType::CAPACITOR) {
+                // I condensatori non contribuiscono in DC
+                continue;
+            } else if (comp->type == ComponentType::INDUCTOR) {
+                // Gli induttori sono cortocircuiti in DC
+                // Trattali come resistenze con valore molto piccolo
+/*auto* ind = dynamic_cast<Inductor*>(comp.get());
+                if (ind) {
+                    int n1 = ind->nodes[0];
+                    int n2 = ind->nodes[1];
+                    double g = 1e6; // Conduttanza molto alta (R ≈ 0)
+                    
+                    if (n1 >= 0) Gdc(n1, n1) += g;
+                    if (n2 >= 0) Gdc(n2, n2) += g;
+                    if (n1 >= 0 && n2 >= 0) {
+                        Gdc(n1, n2) -= g;
+                        Gdc(n2, n1) -= g;
+                    }
+                }*/
+            } else {
+                // Altri componenti (resistori, diodi, ecc.) stampano normalmente
+                // Passa dt=0 per indicare analisi DC
+                comp->stamp(Gdc, Idc, Vdc, 0.0);
+            }
         }
 
         // Nodo di massa forzato
+        Gdc.row(0).setZero();
+        Gdc.col(0).setZero();
         Gdc(0, 0) = 1.0;
         Idc(0) = 0.0;
 
         // Soluzione del sistema
-        VectorXd Vdc = Gdc.lu().solve(Idc);
+        VectorXd Vdc_new = Gdc.lu().solve(Idc);
         
-        // Output di debug
-        std::cout << "  Node Voltage" << std::endl;
-        for (int i = 0; i < circuit.num_nodes; ++i) {
-            std::cout << "      Nodo " << i << ": " << Vdc(i) << " V" << std::endl;
-        }
-
-        // Inizializza i condensatori
+        // Check convergenza (importante per componenti non lineari)
+        double error = (Vdc_new - Vdc).norm();
+        Vdc = Vdc_new;
         
-        std::cout << "  Capacitor Initialization" << std::endl;
-        for (auto& comp : circuit.components) {
-            if (comp->type == ComponentType::CAPACITOR) {
-                auto* c = dynamic_cast<Capacitor*>(comp.get());
-                if (c) {
-                    int n1 = c->nodes[0];
-                    int n2 = c->nodes[1];
-                    double v1 = (n1 > 0 && n1 < circuit.num_nodes) ? Vdc[n1] : 0.0;
-                    double v2 = (n2 > 0 && n2 < circuit.num_nodes) ? Vdc[n2] : 0.0;
-                    double v_cap = v1 - v2;
-                    c->setInitialVoltage(v_cap);
-                    std::cout << "     " << c->name << " inizializzato a " << v_cap << " V" << std::endl;
-                }
+        if (error < tolerance) {
+            // Convergenza raggiunta
+            std::cout << "  Convergenza raggiunta dopo " << (iter + 1) << " iterazioni" << std::endl;
+            std::cout << "  Tensioni nodali:" << std::endl;
+            for (int i = 0; i < circuit.num_nodes; ++i) {
+                std::cout << "      Nodo " << i << ": " << Vdc(i) << " V" << std::endl;
             }
+            
+            std::cout << std::endl;
+            
+            // Copia le tensioni DC come condizioni iniziali
+            V = Vdc;
+            return true;
         }
-
-        std::cout << std::endl;
-        // Copia nei voltages principali (così la simulazione parte da lì)
-        V = Vdc;
-        return true;
     }
+    
+    // Non convergenza
+    std::cerr << "ERRORE: Analisi DC non convergente dopo " << max_iterations << " iterazioni" << std::endl;
+    return false;
+}
 
     bool solve(double input_voltage) {
         static int sample_count = 0;

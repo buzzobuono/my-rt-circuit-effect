@@ -1,0 +1,20 @@
+.title Bazz Fuss + Wool + EQ (alta impedenza)
+
+V1 1 0 DC 9
+R1 1 2 100k
+D1 2 3 D1N914 Is=100e-15 N=1 Vt=0.026 Cj0=2e-12 Vj=0.75 Mj=0.5
+C2 2 4 0.1e-6
+Q1 2 3 0 2N5088 Bf=400 Br=1.271 Is=5.911e-15 Vt=0.026
+C1 5 3 4.7e-6
+
+* WOOL CONTROL
+C_wool 2 6 1e-6
+R_wool 6 0 10k
+
+* EQ CONTROL - resistenza MOLTO più alta
+C_eq 4 7 220e-9
+R_eq 7 0 1e6
+R2 7 0 100M
+
+.input 5
+.output 7

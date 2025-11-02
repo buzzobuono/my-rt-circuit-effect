@@ -1,7 +1,7 @@
 .title Lowpass filter
 
 R 1 2 10k
-CLP 2 0 79.6p
+CLP 2 0 79.6e-9
 
 .input 1
 .output 2

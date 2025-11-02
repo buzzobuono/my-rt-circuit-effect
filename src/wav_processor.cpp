@@ -92,7 +92,8 @@ public:
 
         for (float& s : signalIn) s *= scale;
 
-
+        solver->initialize();
+        
         std::vector<float> signalOut(signalIn.size());
 
         float peak_in = 0.0f, peak_out = 0.0f;

@@ -10,10 +10,12 @@ Q1 2 3 0 2N5088 Bf=400 Br=1.271 Is=5.911e-15 Vt=0.026
 C1 5 3 4.7u
 R2 4 0 100M
 
+Pvol 0 7 4 100k 0.05 LOG
 
 .input 5
-.output 4
+.output 7
 .probe 2
 .ic C1 0.60683
 .ic C2 0.50573
 .warmup 1
+.param 1 Pvol

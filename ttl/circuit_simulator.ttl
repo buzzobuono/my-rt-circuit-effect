@@ -1,0 +1,72 @@
+@prefix lv2:   <http://lv2plug.in/ns/lv2core#> .
+@prefix doap:  <http://usefulinc.com/ns/doap#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix units: <http://lv2plug.in/ns/extensions/units#> .
+@prefix pg:    <http://lv2plug.in/ns/ext/port-groups#> .
+
+<http://github.com/buzzobuono/circuit_simulator>
+    a lv2:Plugin ,
+        lv2:SimulatorPlugin ,
+        lv2:DistortionPlugin ;
+    
+    doap:name "Circuit Simulator" ;
+    doap:description "SPICE-based circuit simulator for guitar effects" ;
+    doap:license <https://opensource.org/licenses/MIT> ;
+    doap:maintainer [
+        foaf:name "Your Name" ;
+        foaf:homepage <https://github.com/yourname> ;
+    ] ;
+    
+    lv2:optionalFeature lv2:hardRTCapable ;
+    lv2:requiredFeature <http://lv2plug.in/ns/ext/options#options> ;
+    
+    lv2:port [
+        a lv2:AudioPort ,
+            lv2:InputPort ;
+        lv2:index 0 ;
+        lv2:symbol "in" ;
+        lv2:name "Audio Input" ;
+        lv2:shortName "In" ;
+    ] , [
+        a lv2:AudioPort ,
+            lv2:OutputPort ;
+        lv2:index 1 ;
+        lv2:symbol "out" ;
+        lv2:name "Audio Output" ;
+        lv2:shortName "Out" ;
+    ] , [
+        a lv2:InputPort ,
+            lv2:ControlPort ;
+        lv2:index 2 ;
+        lv2:symbol "gain" ;
+        lv2:name "Input Gain" ;
+        lv2:shortName "Gain" ;
+        lv2:default 1.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 2.0 ;
+        lv2:scalePoint [
+            rdfs:label "0%" ;
+            rdf:value 0.0
+        ] , [
+            rdfs:label "50%" ;
+            rdf:value 0.5
+        ] , [
+            rdfs:label "100%" ;
+            rdf:value 1.0
+        ] , [
+            rdfs:label "200%" ;
+            rdf:value 2.0
+        ] ;
+    ] , [
+        a lv2:InputPort ,
+            lv2:ControlPort ;
+        lv2:index 3 ;
+        lv2:symbol "bypass" ;
+        lv2:name "Bypass" ;
+        lv2:shortName "Bypass" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 1.0 ;
+        lv2:portProperty lv2:toggled ;
+        lv2:designation lv2:enabled ;
+    ] .

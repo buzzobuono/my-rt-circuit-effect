@@ -30,4 +30,4 @@ Pvol 0 7 5 100k 1 LOG
 .output 7
 *.ic C3 4.517
 .warmup 50
-*.param 1 Pvol
+.param 1 Pvol

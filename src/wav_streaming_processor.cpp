@@ -97,13 +97,15 @@ public:
             sf_close(infile);
             return false;
         }
-
+        
+        constexpr size_t BUFFER_SIZE = 256;
+        
         PaStream* stream;
-        err = Pa_OpenDefaultStream(&stream, 0, sfinfo.channels, paFloat32, sfinfo.samplerate, 256, nullptr, nullptr);
+        err = Pa_OpenDefaultStream(&stream, 0, sfinfo.channels, paFloat32, sfinfo.samplerate, BUFFER_SIZE, nullptr, nullptr);
         if (err != paNoError) { Pa_Terminate(); sf_close(infile); return false; }
         Pa_StartStream(stream);
 
-        constexpr size_t BUFFER_SIZE = 128;
+        
         std::vector<float> buffer(BUFFER_SIZE * sfinfo.channels);
 
         solver->initialize();
@@ -130,6 +132,17 @@ public:
             }
         });
 
+        const PaStreamInfo* streamInfo = Pa_GetStreamInfo(stream);
+std::cout << "\n=== Stream Info ===" << std::endl;
+std::cout << "Sample Rate: " << streamInfo->sampleRate << std::endl;
+std::cout << "Input Latency: " << streamInfo->inputLatency << std::endl;
+std::cout << "Output Latency: " << streamInfo->outputLatency << std::endl;
+
+std::cout << "\n=== Processing Info ===" << std::endl;
+std::cout << "BUFFER_SIZE: " << BUFFER_SIZE << std::endl;
+std::cout << "File channels: " << sfinfo.channels << std::endl;
+std::cout << "File samplerate: " << sfinfo.samplerate << std::endl;
+        
         sf_count_t readcount;
         while (running) {
             readcount = sf_readf_float(infile, buffer.data(), BUFFER_SIZE);

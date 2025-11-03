@@ -186,15 +186,6 @@ public:
                     } else {
                         handleKeyPress(c);
                     }
-//                    } else if (c == 'w' || c == 'W') {
-//                        float newVal = std::min(1.0f, paramValue.load() + 0.05f);
-//                        paramValue.store(newVal);
-//                        circuit.setParamValue(1, newVal);
-//                    } else if (c == 's' || c == 'S') {
-//                        float newVal = std::max(0.0f, paramValue.load() - 0.05f);
-//                        paramValue.store(newVal);
-//                        circuit.setParamValue(1, newVal);
-//                    }
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }

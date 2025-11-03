@@ -66,7 +66,7 @@ static LV2_Handle instantiate(
     
     // Load circuit from bundle
     plugin->circuit = new Circuit();
-    std::string netlist_path = std::string(bundle_path) + "/circuits/default.net";
+    std::string netlist_path = std::string(bundle_path) + "/circuits/bazz_fuss.cir";
     
     if (!plugin->circuit->loadNetlist(netlist_path)) {
         std::cerr << "[Circuit Simulator LV2] ERROR: Failed to load netlist: " << std::endl;

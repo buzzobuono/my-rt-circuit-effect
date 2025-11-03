@@ -38,8 +38,8 @@ install-lv2: lv2
 	@cp lib/$(PLUGIN_SO) $(INSTALL_DIR)/
 	@cp ttl/manifest.ttl $(INSTALL_DIR)/
 	@cp ttl/circuit_simulator.ttl $(INSTALL_DIR)/
-	@if [ -f circuits/nope.cir ]; then \
-		cp circuits/nope.cir $(INSTALL_DIR)/circuits/; \
+	@if [ -f circuits/bazz_fuss.cir ]; then \
+		cp circuits/bazz_fuss.cir $(INSTALL_DIR)/circuits/; \
 	fi
 	@echo "Test with: jalv.gtk http://github.com/buzzobuono/circuit_simulator"
 

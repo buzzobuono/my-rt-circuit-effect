@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <locale>
 
 #include "component.h"
 #include "components/voltage.h"
@@ -39,6 +40,7 @@ public:
     Circuit() : num_nodes(0), output_node(-1) {}
     
     bool loadNetlist(const std::string& filename) {
+        std::locale::global(std::locale::classic());
         std::ifstream file(filename);
         if (!file.is_open()) {
             std::cerr << "Cannot open netlist: " << filename << std::endl;
@@ -93,6 +95,7 @@ public:
                     double Mj;
                     std::string token;
                     while (iss >> token) {
+                        std::cout << token << std::endl;
                         if (token.find("Is=") == 0) Is = std::stod(token.substr(3));
                         else if (token.find("N=") == 0) n = std::stod(token.substr(2));
                         else if (token.find("Vt=") == 0) Vt = std::stod(token.substr(3));
@@ -112,14 +115,16 @@ public:
                     double Is, Bf, Br, Vt;
                     std::string token;
                     while (iss >> token) {
-                        if (token.find("Is=") == 0)
+                        std::cout << token << std::endl;
+                        if (token.find("Is=") == 0) {
                             Is = std::stod(token.substr(3));
-                        else if (token.find("Bf=") == 0)
+                        } else if (token.find("Bf=") == 0) {
                             Bf = std::stod(token.substr(3));
-                        else if (token.find("Br=") == 0)
+                        } else if (token.find("Br=") == 0) {
                             Br = std::stod(token.substr(3));
-                        else if (token.find("Vt=") == 0)
+                        } else if (token.find("Vt=") == 0) {
                             Vt = std::stod(token.substr(3));
+                        }
                     }
                     std::cout << "   Component Transistor name=" << comp_name << " model=" << model << " nc=" << nc << " nb=" << nb << " ne=" << ne <<" Is=" << Is << " Bf=" << Bf << " Br=" << Br << " Vt=" << Vt << std::endl;
                     components.push_back(std::make_unique<BJT>(

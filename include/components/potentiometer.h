@@ -6,6 +6,7 @@
 #include <cmath>
 #include <Eigen/Dense>
 #include "component.h"
+#include "components/resistor.h"
 
 class Potentiometer : public Component
 {
@@ -20,8 +21,12 @@ private:
     double _r_total;
     double _position; // [0.0, 1.0]
     TaperType _taper;
+    
+    // Valori delle resistenze calcolate
+    double _r1_val; // n1-nw
+    double _r2_val; // n2-nw
 
-    static constexpr double R_MIN = 1e-9;
+    static constexpr double R_MIN = 1e-6;
     static constexpr double R_MAX = 1e9;
 
     // Applica il tipo di taper
@@ -42,13 +47,29 @@ private:
             return pos;
         }
     }
+    
+    void updateResistances()
+    {
+        if (_r_total > R_MAX)
+        {
+            _r1_val = R_MAX;
+            _r2_val = R_MAX;
+            return;
+        }
+
+        double taperedPos = applyTaper(_position);
+
+        // Divide la resistenza totale in due sezioni
+        _r1_val = std::max(_r_total * (1.0 - taperedPos), R_MIN);  // n1-nw
+        _r2_val = std::max(_r_total * taperedPos, R_MIN);          // n2-nw
+    }
 
 public:
     Potentiometer(const std::string &comp_name,
                   int n1, int nw, int n2,
                   double r_total,
                   double position,
-                  TaperType taper)
+                  TaperType taper = TaperType::LINEAR)
         : _r_total(r_total), _position(position), _taper(taper)
     {
         if (r_total <= 0)
@@ -61,6 +82,8 @@ public:
         type = ComponentType::POTENTIOMETER;
         name = comp_name;
         nodes = {n1, n2, nw};
+        
+        updateResistances();
     }
 
     double getTotalResistance() const { 
@@ -74,51 +97,34 @@ public:
     void setPosition(double pos)
     {
         _position = std::clamp(pos, 0.0, 1.0);
+        updateResistances();
     }
 
     TaperType getTaper() const { 
         return _taper; 
     }
+    
+    double getResistance1() const {
+        return _r1_val;
+    }
+    
+    double getResistance2() const {
+        return _r2_val;
+    }
 
-    void stamp(Eigen::MatrixXd &G, Eigen::VectorXd &I, const Eigen::VectorXd &V, double /*dt*/) override
+    void stamp(Eigen::MatrixXd &G, Eigen::VectorXd &I, const Eigen::VectorXd &V, double dt) override
     {
         if (_r_total > R_MAX)
             return;
 
-        double taperedPos = applyTaper(_position);
-
-        // Divide la resistenza totale in due sezioni
-        double r1 = std::max(_r_total * (1.0 - taperedPos), R_MIN);  // n1-nw
-        double r2 = std::max(_r_total * taperedPos, R_MIN);          // n2-nw
-
-        double g1 = 1.0 / r1;
-        double g2 = 1.0 / r2;
-
         int n1 = nodes[0], n2 = nodes[1], nw = nodes[2];
 
-        // --- Stamp r1 (n1 - nw) ---
-        if (n1 != 0)
-        {
-            G(n1, n1) += g1;
-            if (nw != 0)
-            {
-                G(n1, nw) -= g1;
-                G(nw, n1) -= g1;
-                G(nw, nw) += g1;
-            }
-        }
-
-        // --- Stamp r2 (n2 - nw) ---
-        if (n2 != 0)
-        {
-            G(n2, n2) += g2;
-            if (nw != 0)
-            {
-                G(n2, nw) -= g2;
-                G(nw, n2) -= g2;
-                G(nw, nw) += g2;
-            }
-        }
+        // Crea resistori temporanei e delega lo stamping
+        Resistor r1(name + "_r1", n1, nw, _r1_val);
+        Resistor r2(name + "_r2", n2, nw, _r2_val);
+        
+        r1.stamp(G, I, V, dt);
+        r2.stamp(G, I, V, dt);
     }
 };
 

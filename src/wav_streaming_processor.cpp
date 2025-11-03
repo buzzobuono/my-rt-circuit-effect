@@ -58,15 +58,18 @@ private:
     Circuit circuit;
     std::unique_ptr<CircuitSolver> solver;
     double sample_rate;
+    double input_gain;
     int input_impedance;
-    float paramValue {1.0f};            // parametro modificabile live
-    std::mutex param_mutex;        // mutex per accesso sicuro
-
+    std::atomic<float> paramValue;            // parametro modificabile live
+   
 public:
     WavStreamingProcessor(const std::string& netlist_file,
                           double sample_rate,
-                          int input_impedance)
+                          int input_impedance,
+                          double input_gain
+                        )
         : sample_rate(sample_rate),
+          input_gain(input_gain),
           input_impedance(input_impedance)
     {
         if (!circuit.loadNetlist(netlist_file)) {
@@ -97,9 +100,9 @@ public:
             sf_close(infile);
             return false;
         }
-        
+
         constexpr size_t BUFFER_SIZE = 256;
-        
+
         PaStream* stream;
         err = Pa_OpenDefaultStream(&stream, 0, sfinfo.channels, paFloat32, sfinfo.samplerate, BUFFER_SIZE, nullptr, nullptr);
         if (err != paNoError) { Pa_Terminate(); sf_close(infile); return false; }
@@ -109,40 +112,29 @@ public:
         std::vector<float> buffer(BUFFER_SIZE * sfinfo.channels);
 
         solver->initialize();
-        
+        paramValue.store(circuit.getParamValue(1));
+
         bool running = true;
         setNonBlocking(true);
         std::thread inputThread([&]() {
             while (running) {
                 if (kbhit()) {
                     int c = getch();
-                    std::lock_guard<std::mutex> lock(param_mutex);
                     if (c == 27) { // ESC per uscire
                         running = false;
                     } else if (c == 'w') {
-                        paramValue += 0.05f;
-                        if (paramValue > 1) paramValue = 1;
+                        float newVal = std::min(1.0f, paramValue.load() + 0.05f);
+                        paramValue.store(newVal);
                     } else if (c == 's') {
-                        paramValue -= 0.05f;
-                        if (paramValue < 0) paramValue = 0;
+                        float newVal = std::max(0.0f, paramValue.load() - 0.05f);
+                        paramValue.store(newVal);
                     }
-                    circuit.setParam(1, paramValue);
+                    circuit.setParamValue(1, paramValue.load());
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         });
 
-        const PaStreamInfo* streamInfo = Pa_GetStreamInfo(stream);
-std::cout << "\n=== Stream Info ===" << std::endl;
-std::cout << "Sample Rate: " << streamInfo->sampleRate << std::endl;
-std::cout << "Input Latency: " << streamInfo->inputLatency << std::endl;
-std::cout << "Output Latency: " << streamInfo->outputLatency << std::endl;
-
-std::cout << "\n=== Processing Info ===" << std::endl;
-std::cout << "BUFFER_SIZE: " << BUFFER_SIZE << std::endl;
-std::cout << "File channels: " << sfinfo.channels << std::endl;
-std::cout << "File samplerate: " << sfinfo.samplerate << std::endl;
-        
         sf_count_t readcount;
         while (running) {
             readcount = sf_readf_float(infile, buffer.data(), BUFFER_SIZE);
@@ -153,11 +145,7 @@ std::cout << "File samplerate: " << sfinfo.samplerate << std::endl;
                 continue;
             }
 
-            float localParamValue;
-            {
-                std::lock_guard<std::mutex> lock(param_mutex);
-                localParamValue = paramValue;
-            }
+            float localParamValue = paramValue.load(std::memory_order_relaxed);
 
             auto bufferStart = clock::now();
 
@@ -220,11 +208,13 @@ int main(int argc, char* argv[]) {
 
     std::string input_file = "input.wav";
     std::string netlist_file;
+    double input_gain;
     int input_impedance;
 
     app.add_option("-i,--input", input_file, "File di input WAV")
         ->check(CLI::ExistingFile)
         ->default_val(input_file);
+    app.add_option("-g,--input-gain", input_gain, "Input Gain")->check(CLI::Range(0.0f, 5.0f))->default_val(1);
     app.add_option("-c,--circuit", netlist_file, "Netlist del circuito SPICE")
         ->check(CLI::ExistingFile)
         ->required();
@@ -245,7 +235,7 @@ int main(int argc, char* argv[]) {
         double sample_rate = sf_info.samplerate;
         sf_close(tmp);
 
-        WavStreamingProcessor processor(netlist_file, sample_rate, input_impedance);
+        WavStreamingProcessor processor(netlist_file, sample_rate, input_gain, input_impedance);
         if (!processor.processAndPlay(input_file))
             return 1;
 

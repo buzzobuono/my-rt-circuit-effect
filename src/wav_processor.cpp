@@ -229,8 +229,8 @@ int main(int argc, char *argv[]) {
     CLI::App app{"Pedal Circuit Simulator"};
     
     
-    std::string input_file = "input.wav";
-    std::string output_file = "output.wav";
+    std::string input_file = "input/input.wav";
+    std::string output_file = "output/output.wav";
     std::string netlist_file;
     float max_input_voltage;
     int input_impedance;

@@ -69,15 +69,14 @@ static LV2_Handle instantiate(
     std::string netlist_path = std::string(bundle_path) + "/circuits/default.net";
     
     if (!plugin->circuit->loadNetlist(netlist_path)) {
-        std::cerr << "[Circuit Simulator LV2] ERROR: Failed to load netlist: " 
-                  << y << std::endl;
+        std::cerr << "[Circuit Simulator LV2] ERROR: Failed to load netlist: " << std::endl;
         
         // Create a simple passthrough circuit as fallback
         // (You might want to create a minimal working circuit here)
         std::cerr << "[Circuit Simulator LV2] Using passthrough mode" << std::endl;
         plugin->circuit = nullptr;
         plugin->solver = nullptr;
-        return (ù)plugin;
+        return plugin;
     }
     
     try {

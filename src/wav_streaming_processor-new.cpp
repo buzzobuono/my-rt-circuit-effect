@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <mutex>
 #include <chrono>
+#include <map>
 
 #include <sndfile.h>
 #include <portaudio.h>
@@ -50,6 +51,29 @@ int getch() {
     return getchar();
 }
 
+struct Parameter {
+    int id;
+    std::atomic<float> value;
+    
+    Parameter(int id, float defaultValue) : id(id) {
+        value.store(std::clamp(defaultValue, 0.0f, 1.0f));
+    }
+    
+    void increase() {
+        float newVal = std::min(1.0f, value.load() + 0.05f);
+        value.store(newVal);
+    }
+    
+    void decrease() {
+        float newVal = std::max(0.0f, value.load() - 0.05f);
+        value.store(newVal);
+    }
+    
+    float get() const {
+        return value.load(std::memory_order_relaxed);
+    }
+};
+
 // =============================================================
 // Classe streaming con controllo live
 // =============================================================
@@ -60,9 +84,9 @@ private:
     double sample_rate;
     double input_gain;
     int input_impedance;
-    std::map<int, std::atomic<float>> paramIds;
-    int currentParamIndex = 0;
-
+    std::vector<Parameter> parameters;
+    int currentParamIndex;
+   
 public:
     WavStreamingProcessor(const std::string& netlist_file,
                           double sample_rate,
@@ -70,64 +94,38 @@ public:
                           double input_gain)
         : sample_rate(sample_rate),
           input_gain(input_gain),
-          input_impedance(input_impedance)
+          input_impedance(input_impedance),
+          currentParamIndex(0)
     {
         if (!circuit.loadNetlist(netlist_file)) {
             throw std::runtime_error("Failed to load netlist");
         }
 
         solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance);
-
+        
+        // Inizializza i parametri dal solver
         initializeParameters();
     }
 
     void initializeParameters() {
-        std::vector<int> ids = circuit.getParameterIds();
-        if (ids.empty()) {
-            std::cout << "   No parameter defined" << std::endl;
+        std::vector<int> paramIds = circuit.getParameterIds();
+        
+        if (paramIds.empty()) {
+            std::cout << "⚠ Nessun parametro definito nel circuito\n";
             return;
         }
-        for (int id : ids) {
+        
+        std::cout << "📋 Parametri trovati:\n";
+        for (int id : paramIds) {
             float defaultValue = circuit.getParamValue(id);
-            paramIds[id].store(defaultValue);
-            std::cout << "   " << id << " = " << paramIds[id].load() << std::endl;
+            parameters.emplace_back(id, defaultValue);
+            std::cout << "  [" << parameters.size() - 1 << "] ID=" << id 
+                      << " = " << defaultValue << "\n";
         }
-    }
-
-    void handleKeyPress(int c) {
-        if (paramIds.empty()) return;
-        float value;
-        switch (c) {
-            case 'w': case 'W':
-                value =  std::min(1.0f, paramIds[currentParamIndex].load() + 0.05f);
-                paramIds[currentParamIndex].store(value);
-                circuit.setParamValue(currentParamIndex, value);
-                break;
-            case 's': case 'S':
-                value =  std::max(0.0f, paramIds[currentParamIndex].load() - 0.05f);
-                paramIds[currentParamIndex].store(value);
-                circuit.setParamValue(currentParamIndex, value);
-                break;
-            case 'a': case 'A':
-                currentParamIndex = (currentParamIndex - 1 + paramIds.size()) % paramIds.size();
-                std::cout << "Current param index " << currentParamIndex << std::endl;
-                break;
-            case 'd': case 'D':
-                currentParamIndex = (currentParamIndex + 1) % paramIds.size();
-                std::cout << "Current param index " << currentParamIndex << std::endl;
-                break;
+        
+        if (!parameters.empty()) {
+            currentParamIndex = 0;
         }
-    }
-
-    void printControls() {
-        std::cout << "╔══════════════════════════════════════════╗" << std::endl;
-        std::cout << "║          CONTROLLI LIVE                  ║" << std::endl;
-        std::cout << "╠══════════════════════════════════════════╣" << std::endl;
-        std::cout << "║  W/S : Aumenta/Diminuisci parametro      ║" << std::endl;
-        std::cout << "║  A/D : Parametro precedente/successivo   ║" << std::endl;
-        std::cout << "║  ESC : Esci                              ║" << std::endl;
-        std::cout << "╚══════════════════════════════════════════╝" << std::endl;
-        std::cout << std::endl;
     }
 
     bool processAndPlay(const std::string& input_file) {
@@ -152,7 +150,7 @@ public:
             return false;
         }
 
-        constexpr size_t BUFFER_SIZE = 128;
+        constexpr size_t BUFFER_SIZE = 2048;
 
         PaStream* stream;
         err = Pa_OpenDefaultStream(&stream, 0, sfinfo.channels, paFloat32, 
@@ -167,15 +165,11 @@ public:
         std::vector<float> buffer(BUFFER_SIZE * sfinfo.channels);
 
         solver->initialize();
-        
+
         bool running = true;
         setNonBlocking(true);
         
         printControls();
-
-        std::cout << "\nControlli: W (aumenta) | S (diminuisce) | ESC (esci)\n";
-        std::cout << "Buffer size: " << BUFFER_SIZE << " frames\n";
-        std::cout << "Channels: " << sfinfo.channels << "\n\n";
 
         std::thread inputThread([&]() {
             while (running) {
@@ -183,18 +177,9 @@ public:
                     int c = getch();
                     if (c == 27) { // ESC
                         running = false;
-                    } else {
+                    } else if (!parameters.empty()) {
                         handleKeyPress(c);
                     }
-//                    } else if (c == 'w' || c == 'W') {
-//                        float newVal = std::min(1.0f, paramValue.load() + 0.05f);
-//                        paramValue.store(newVal);
-//                        circuit.setParamValue(1, newVal);
-//                    } else if (c == 's' || c == 'S') {
-//                        float newVal = std::max(0.0f, paramValue.load() - 0.05f);
-//                        paramValue.store(newVal);
-//                        circuit.setParamValue(1, newVal);
-//                    }
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
@@ -209,13 +194,16 @@ public:
                 continue;
             }
 
+            // Sincronizza tutti i parametri con il circuit
+            for (auto& param : parameters) {
+                circuit.setParamValue(param.id, param.get());
+            }
+
             auto bufferStart = clock::now();
 
-            // OTTIMIZZAZIONE: processa per frame invece che per campione
             size_t numSamples = readcount * sfinfo.channels;
             
             if (sfinfo.channels == 1) {
-                // Mono: processa direttamente
                 for (size_t i = 0; i < numSamples; ++i) {
                     float vin = buffer[i] * input_gain;
                     float vout = 0.0f;
@@ -225,7 +213,6 @@ public:
                     buffer[i] = std::isfinite(vout) ? vout : 0.0f;
                 }
             } else if (sfinfo.channels == 2) {
-                // Stereo: processa solo canale sinistro e copia a destra
                 for (size_t frame = 0; frame < static_cast<size_t>(readcount); ++frame) {
                     size_t idx = frame * 2;
                     float vin = buffer[idx] * input_gain;
@@ -234,11 +221,10 @@ public:
                         vout = solver->getOutputVoltage();
                     }
                     vout = std::isfinite(vout) ? vout : 0.0f;
-                    buffer[idx] = vout;      // Left
-                    buffer[idx + 1] = vout;  // Right (copia)
+                    buffer[idx] = vout;
+                    buffer[idx + 1] = vout;
                 }
             } else {
-                // Multi-canale: processa primo canale e replica
                 for (size_t frame = 0; frame < static_cast<size_t>(readcount); ++frame) {
                     size_t baseIdx = frame * sfinfo.channels;
                     float vin = buffer[baseIdx] * input_gain;
@@ -265,11 +251,7 @@ public:
             double elapsedMs = std::chrono::duration<double, std::milli>(now - lastReportTime).count();
 
             if (elapsedMs > 1000.0) {
-                std::cout << "BufTime: " << bufferTimeMs << " ms | "
-                          << "BufDuration: " << bufferDurationMs << " ms | "
-                          << "Latency: " << perceivedLatencyMs << " ms | "
-                          << "Worst: " << worstBufferLatencyMs << " ms       " 
-                          << std::endl << std::flush;
+                printStatus(bufferTimeMs, bufferDurationMs, perceivedLatencyMs, worstBufferLatencyMs);
                 lastReportTime = now;
             }
 
@@ -292,6 +274,59 @@ public:
         std::cout << "\n✓ Riproduzione terminata\n";
         return true;
     }
+
+private:
+    void handleKeyPress(int c) {
+        if (parameters.empty()) return;
+        
+        switch (c) {
+            case 'w': case 'W':
+                parameters[currentParamIndex].increase();
+                break;
+            case 's': case 'S':
+                parameters[currentParamIndex].decrease();
+                break;
+            case 'a': case 'A':
+                currentParamIndex = (currentParamIndex - 1 + parameters.size()) % parameters.size();
+                break;
+            case 'd': case 'D':
+                currentParamIndex = (currentParamIndex + 1) % parameters.size();
+                break;
+        }
+    }
+
+    void printControls() {
+        std::cout << "\n╔══════════════════════════════════════════╗\n";
+        std::cout << "║          CONTROLLI LIVE                  ║\n";
+        std::cout << "╠══════════════════════════════════════════╣\n";
+        std::cout << "║  W/S : Aumenta/Diminuisci parametro     ║\n";
+        std::cout << "║  A/D : Parametro precedente/successivo  ║\n";
+        std::cout << "║  ESC : Esci                              ║\n";
+        std::cout << "╚══════════════════════════════════════════╝\n";
+        std::cout << "Buffer size: " << 2048 << " frames\n\n";
+    }
+
+    void printStatus(double bufferTimeMs, double bufferDurationMs, 
+                     double perceivedLatencyMs, double worstBufferLatencyMs) {
+        std::cout << "\r";
+        
+        if (!parameters.empty()) {
+            auto& current = parameters[currentParamIndex];
+            std::cout << "[P" << current.id << "=" 
+                      << std::fixed << std::setprecision(2) << current.get() << "] ";
+        }
+        
+        std::cout << "BufTime: " << std::setprecision(1) << bufferTimeMs << "ms | "
+                  << "Latency: " << perceivedLatencyMs << "ms | "
+                  << "Worst: " << worstBufferLatencyMs << "ms";
+        
+        if (parameters.size() > 1) {
+            std::cout << " | [" << (currentParamIndex + 1) 
+                      << "/" << parameters.size() << "]";
+        }
+        
+        std::cout << "      " << std::flush;
+    }
 };
 
 // =============================================================
@@ -300,7 +335,7 @@ public:
 int main(int argc, char* argv[]) {
     CLI::App app{"Pedal Circuit Simulator — WAV Streaming Player"};
 
-    std::string input_file = "input/input.wav";
+    std::string input_file = "input.wav";
     std::string netlist_file;
     double input_gain = 1.0;
     int input_impedance = 25000;

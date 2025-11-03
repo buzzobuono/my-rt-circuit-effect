@@ -259,6 +259,16 @@ public:
         std::cout << std::endl;
     }
 
+    std::vector<int> getParameterIds() const {
+        std::vector<int> ids;
+        ids.reserve(param_map.size());
+        for (const auto& [id, pot] : param_map) {
+            ids.push_back(id);
+        }
+        std::sort(ids.begin(), ids.end());
+        return ids;
+    }
+
     void setParamValue(int id, double value) {
         auto it = param_map.find(id);
         if (it == param_map.end())

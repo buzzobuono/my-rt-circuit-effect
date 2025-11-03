@@ -66,7 +66,7 @@ private:
 
 public:
     Potentiometer(const std::string &comp_name,
-                  int n1, int nw, int n2,
+                  int n1, int n2, int nw,
                   double r_total,
                   double position,
                   TaperType taper = TaperType::LINEAR)

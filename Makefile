@@ -27,7 +27,7 @@ wav_streaming_processor: clean_wav_streaming_processor create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/wav_streaming_processor.cpp -o bin/wav_streaming_processor $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${DEBUG}
 
 dc_analisys: clean_dc_analisys
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/dc_analisys.cpp -o dc_analisys ${DEBUG}
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/dc_analisys.cpp -o bin/dc_analisys ${DEBUG}
 
 lv2: clean_lv2
 	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES) src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG}

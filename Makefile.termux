@@ -32,14 +32,15 @@ dc_analisys: clean_dc_analisys
 lv2: clean_lv2
 	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES) src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG}
 
+
 install-lv2: lv2
 	@mkdir -p $(INSTALL_DIR)
 	@mkdir -p $(INSTALL_DIR)/circuits
 	@cp lib/$(PLUGIN_SO) $(INSTALL_DIR)/
 	@cp ttl/manifest.ttl $(INSTALL_DIR)/
 	@cp ttl/circuit_simulator.ttl $(INSTALL_DIR)/
-	@if [ -f circuits/nope.cir ]; then \
-		cp circuits/nope.cir $(INSTALL_DIR)/circuits/; \
+	@if [ -f circuits/bazz_fuss.cir ]; then \
+		cp circuits/bazz_fuss.cir $(INSTALL_DIR)/circuits/; \
 	fi
 	@echo "Test with: jalv.gtk http://github.com/buzzobuono/circuit_simulator"
 

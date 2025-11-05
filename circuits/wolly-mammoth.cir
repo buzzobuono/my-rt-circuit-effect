@@ -1,20 +1,69 @@
-.title Bazz Fuss + Wool + EQ (alta impedenza)
+.title Woolly Mammoth
 
-V1 1 0 DC 9
-R1 1 2 100k
-D1 2 3 D1N914 Is=100e-15 N=1 Vt=0.026 Cj0=2e-12 Vj=0.75 Mj=0.5
-C2 2 4 0.1e-6
-Q1 2 3 0 2N5088 Bf=400 Br=1.271 Is=5.911e-15 Vt=0.026
-C1 5 3 4.7e-6
+VCC 9 0 DC 9V
 
-* WOOL CONTROL
-C_wool 2 6 1e-6
-R_wool 6 0 10k
+R3 9 x1 51k
+R4 9 x2 20k
+Q1 x1 x3 0 Q2N3904
+R2 x3 x4 100k
+Ppinch x4 x5 xw
 
-* EQ CONTROL - resistenza MOLTO più alta
-C_eq 4 7 220e-9
-R_eq 7 0 1e6
-R2 7 0 100M
+C1 1 2 220e-9
 
-.input 5
-.output 7
+C2 2 0 10e-9
+
+
+* Resistore di input bias
+R1 1 0 2.2Meg
+
+* POTENZIOMETRO 1: PINCH (100k) - Controlla bias transistor
+* Tra +9V e emettitori, cursore alla base Q1
+RPINCH_A 9 2 50k
+RPINCH_B 2 4 50k
+
+* Collegamento base Q1
+R_BASE1 2 1 10k
+
+* PRIMO STADIO - Q1
+Q1 3 2 4 Q2N3904
+
+* SECONDO STADIO - Q2
+Q2 5 3 4 Q2N3904
+
+* Resistore di emettitore comune
+RE 4 0 10k
+
+* Condensatore di bypass emettitore
+CE 4 0 10u
+
+* Resistore di collettore Q2
+RC 9 5 5.6k
+
+* POTENZIOMETRO 2: WOOL (100k) - Controllo texture/lana
+* Filtro passa-basso variabile
+CWOOL 5 6 100n
+RWOOL_A 6 wool_mid 50k
+RWOOL_B wool_mid 0 50k
+
+* POTENZIOMETRO 3: EQ (100k) - Controllo equalizzazione
+* Switch HIGH/LOW simulato come pot
+CEQ 6 7 47n
+REQ_A 7 eq_mid 50k
+REQ_B eq_mid 0 50k
+
+* POTENZIOMETRO 4: OUT (100k) - Volume di uscita
+ROUT_A 7 8 50k
+ROUT_B 8 0 50k
+
+* Condensatore di uscita
+C4 8 out 10u
+
+* Carico di uscita
+RLOAD out 0 100k
+
+* Modello transistor 2N3904/BC547
+.model Q2N3904 NPN(IS=1E-14 BF=200 VAF=100 IKF=0.3 
++ XTB=1.5 BR=3 CJC=8E-12 CJE=25E-12 TR=100E-9 TF=400E-12
++ ITF=1 VTF=2 XTF=3 RB=10 RC=1 RE=0.5)
+
+.input 10

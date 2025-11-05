@@ -60,17 +60,21 @@ private:
     double sample_rate;
     double input_gain;
     int input_impedance;
+    int buffer_size;
     std::map<int, std::atomic<float>> paramIds;
     int currentParamIndex = 0;
 
 public:
     WavStreamingProcessor(const std::string& netlist_file,
                           double sample_rate,
+                          double input_gain,
                           int input_impedance,
-                          double input_gain)
+                          int buffer_size
+                          )
         : sample_rate(sample_rate),
           input_gain(input_gain),
-          input_impedance(input_impedance)
+          input_impedance(input_impedance),
+          buffer_size(buffer_size)
     {
         if (!circuit.loadNetlist(netlist_file)) {
             throw std::runtime_error("Failed to load netlist");
@@ -151,12 +155,10 @@ public:
             sf_close(infile);
             return false;
         }
-
-        constexpr size_t BUFFER_SIZE = 128;
-
+        
         PaStream* stream;
         err = Pa_OpenDefaultStream(&stream, 0, sfinfo.channels, paFloat32, 
-                                   sfinfo.samplerate, BUFFER_SIZE, nullptr, nullptr);
+                                   sfinfo.samplerate, buffer_size, nullptr, nullptr);
         if (err != paNoError) { 
             Pa_Terminate(); 
             sf_close(infile); 
@@ -164,7 +166,7 @@ public:
         }
         Pa_StartStream(stream);
 
-        std::vector<float> buffer(BUFFER_SIZE * sfinfo.channels);
+        std::vector<float> buffer(buffer_size * sfinfo.channels);
 
         solver->initialize();
         
@@ -174,7 +176,7 @@ public:
         printControls();
 
         std::cout << "\nControlli: W (aumenta) | S (diminuisce) | ESC (esci)\n";
-        std::cout << "Buffer size: " << BUFFER_SIZE << " frames\n";
+        std::cout << "Buffer size: " << buffer_size << " frames\n";
         std::cout << "Channels: " << sfinfo.channels << "\n\n";
 
         std::thread inputThread([&]() {
@@ -193,7 +195,7 @@ public:
 
         sf_count_t readcount;
         while (running) {
-            readcount = sf_readf_float(infile, buffer.data(), BUFFER_SIZE);
+            readcount = sf_readf_float(infile, buffer.data(), buffer_size);
 
             if (readcount == 0) {
                 sf_seek(infile, 0, SEEK_SET);
@@ -291,24 +293,27 @@ public:
 int main(int argc, char* argv[]) {
     CLI::App app{"Pedal Circuit Simulator — WAV Streaming Player"};
 
-    std::string input_file = "input/input.wav";
+    std::string input_file;
     std::string netlist_file;
     double input_gain = 1.0;
     int input_impedance = 25000;
+    int buffer_size = 128;
 
     app.add_option("-i,--input", input_file, "File di input WAV")
-        ->check(CLI::ExistingFile)
-        ->default_val(input_file);
-    app.add_option("-g,--input-gain", input_gain, "Input Gain")
-        ->check(CLI::Range(0.0, 5.0))
-        ->default_val(1.0);
+        ->check(CLI::ExistingFile);
     app.add_option("-c,--circuit", netlist_file, "Netlist del circuito SPICE")
         ->check(CLI::ExistingFile)
         ->required();
     app.add_option("-I,--input-impedance", input_impedance, "Impedenza d'ingresso [Ohm]")
         ->check(CLI::Range(0, 30000))
         ->default_val(25000);
-
+    app.add_option("-g,--input-gain", input_gain, "Input Gain")
+        ->check(CLI::Range(0.0, 5.0))
+        ->default_val(1.0);
+    app.add_option("-b,--buffer-size", buffer_size, "Buffer Size")
+        ->check(CLI::Range(128, 4096))
+        ->default_val(128);
+    
     CLI11_PARSE(app, argc, argv);
     
     try {
@@ -322,7 +327,7 @@ int main(int argc, char* argv[]) {
         double sample_rate = sf_info.samplerate;
         sf_close(tmp);
 
-        WavStreamingProcessor processor(netlist_file, sample_rate, input_impedance, input_gain);
+        WavStreamingProcessor processor(netlist_file, sample_rate, input_gain, input_impedance, buffer_size);
         if (!processor.processAndPlay(input_file))
             return 1;
 

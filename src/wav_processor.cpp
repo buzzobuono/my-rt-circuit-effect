@@ -229,16 +229,16 @@ int main(int argc, char *argv[]) {
     CLI::App app{"Pedal Circuit Simulator"};
     
     
-    std::string input_file = "input/input.wav";
-    std::string output_file = "output/output.wav";
+    std::string input_file;
+    std::string output_file;
     std::string netlist_file;
     float max_input_voltage;
     int input_impedance;
     bool bypass = false;
 
-    app.add_option("-i,--input", input_file, "File di input")->default_val(input_file)->check(CLI::ExistingFile);
-    app.add_option("-o,--output", output_file, "File di output")->default_val(output_file);
-    app.add_option("-c,--circuit", netlist_file, "Netlist file")->default_val(netlist_file)->check(CLI::ExistingFile);
+    app.add_option("-i,--input", input_file, "File di input")->check(CLI::ExistingFile);
+    app.add_option("-o,--output", output_file, "File di output");
+    app.add_option("-c,--circuit", netlist_file, "Netlist file")->check(CLI::ExistingFile);
     app.add_option("-v,--max-input-voltage", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(0.15);
     app.add_option("-I,--input-impedance", input_impedance, "Input Impedance")->check(CLI::Range(0, 30000))->default_val(25000);
     app.add_flag("-b,--bypass", bypass, "Bypass Circuit")->default_val(false);

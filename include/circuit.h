@@ -21,6 +21,7 @@
 #include "components/bjt.h"
 #include "components/mosfet.h"
 #include "components/potentiometer.h"
+#include "components/wire.h"
 
 #include <Eigen/Dense>
 #include <Eigen/LU>  
@@ -148,6 +149,15 @@ public:
                     auto vs = std::make_unique<VoltageSource>(comp_name, n1, n2, value);
                     std::cout << "   Component VoltageSource name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << value << std::endl;
                     components.push_back(std::move(vs));
+                    max_node = std::max(max_node, std::max(n1, n2));
+                    break;
+                }
+                case 'W': {
+                    int n1, n2;
+                    iss >> n1 >> n2;
+                    auto wire = std::make_unique<Wire>(comp_name, n1, n2);
+                    std::cout << "   Component Wirw name=" << comp_name << " n1=" << n1 << " n2=" << n2 << std::endl;
+                    components.push_back(std::move(wire));
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }

@@ -311,7 +311,7 @@ int main(int argc, char* argv[]) {
         ->check(CLI::Range(0.0, 5.0))
         ->default_val(1.0);
     app.add_option("-b,--buffer-size", buffer_size, "Buffer Size")
-        ->check(CLI::Range(128, 4096))
+        ->check(CLI::Range(128, 16384))
         ->default_val(128);
     
     CLI11_PARSE(app, argc, argv);

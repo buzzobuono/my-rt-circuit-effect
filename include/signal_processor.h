@@ -25,7 +25,7 @@ public:
             throw std::runtime_error("Failed to load netlist");
         }
         
-        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance);
+        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance, 20, 1e-8);
         
     }
     

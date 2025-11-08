@@ -38,7 +38,7 @@ private:
     
     
 public:
-    CircuitSolver(Circuit& ckt, double sample_rate, int input_impedance, int max_iterations = 50, double tolerance = 1e-8, int max_non_convergence_warning = 50) 
+    CircuitSolver(Circuit& ckt, double sample_rate, int input_impedance, int max_iterations, double tolerance, int max_non_convergence_warning = 50) 
         : circuit(ckt), 
           dt(1.0 / sample_rate),
           input_impedance(input_impedance),

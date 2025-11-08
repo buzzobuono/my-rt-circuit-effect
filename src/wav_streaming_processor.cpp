@@ -69,6 +69,8 @@ public:
                           double sample_rate,
                           double input_gain,
                           int input_impedance,
+                          int max_iterations,
+                          double tolerance,
                           int buffer_size
                           )
         : sample_rate(sample_rate),
@@ -80,7 +82,7 @@ public:
             throw std::runtime_error("Failed to load netlist");
         }
 
-        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance);
+        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance, max_iterations, tolerance);
 
         initializeParameters();
     }
@@ -297,8 +299,10 @@ int main(int argc, char* argv[]) {
     std::string netlist_file;
     double input_gain = 1.0;
     int input_impedance = 25000;
+    int max_iterations;
+    double tolerance;
     int buffer_size = 128;
-
+    
     app.add_option("-i,--input", input_file, "File di input WAV")
         ->check(CLI::ExistingFile);
     app.add_option("-c,--circuit", netlist_file, "Netlist del circuito SPICE")
@@ -310,8 +314,12 @@ int main(int argc, char* argv[]) {
     app.add_option("-g,--input-gain", input_gain, "Input Gain")
         ->check(CLI::Range(0.0, 5.0))
         ->default_val(1.0);
+    app.add_option("-m,--max-iterations", max_iterations, "Max solver's iterations")
+        ->default_val(50);
+    app.add_option("-t,--tolerance", tolerance, "Solver's tolerance")
+        ->default_val(1e-8);
     app.add_option("-b,--buffer-size", buffer_size, "Buffer Size")
-        ->check(CLI::Range(128, 16384))
+        ->check(CLI::Range(32, 131072))
         ->default_val(128);
     
     CLI11_PARSE(app, argc, argv);
@@ -327,7 +335,7 @@ int main(int argc, char* argv[]) {
         double sample_rate = sf_info.samplerate;
         sf_close(tmp);
 
-        WavStreamingProcessor processor(netlist_file, sample_rate, input_gain, input_impedance, buffer_size);
+        WavStreamingProcessor processor(netlist_file, sample_rate, input_gain, input_impedance, max_iterations, tolerance, buffer_size);
         if (!processor.processAndPlay(input_file))
             return 1;
 

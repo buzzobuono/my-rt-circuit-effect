@@ -19,24 +19,30 @@ private:
     float max_input_voltage;
     int input_impedance;
     bool bypass;
+    int max_iterations;
+    double tolerance;
 
 public:
     WavFileProcessor(const std::string &netlist_file,
                      double sample_rate,
                      float max_input_voltage,
                      int input_impedance,
-                     bool bypass
+                     bool bypass,
+                     int max_iterations,
+                     double tolerance
                     )
         : sample_rate(sample_rate),
           max_input_voltage(max_input_voltage),
           input_impedance(input_impedance),
-          bypass(bypass)
+          bypass(bypass),
+          max_iterations(max_iterations),
+          tolerance(tolerance)
     {
         if (!circuit.loadNetlist(netlist_file)) {
             throw std::runtime_error("Failed to load netlist");
         }
         
-        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance);
+        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance, max_iterations, tolerance);
     }
 
     bool process(const std::string &input_file, const std::string &output_file)
@@ -132,6 +138,7 @@ public:
         std::cout << "  Input Peak: " << peak_in << " V, " << 20 * std::log10(peak_in) << " dBFS, RMS: " << 20 * std::log10(rms_in) << " dBFS" << std::endl;
         std::cout << "  Output Peak: " << peak_out << " V, " << 20 * std::log10(peak_out) << " dBFS, RMS: " << 20 * std::log10(rms_out) << " dBFS" << std::endl;
         std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
+        
         std::cout << std::endl;
 
         writeWav(signalOut, output_file, sample_rate);
@@ -235,13 +242,17 @@ int main(int argc, char *argv[]) {
     float max_input_voltage;
     int input_impedance;
     bool bypass = false;
-
+    int max_iterations;
+    double tolerance;
+    
     app.add_option("-i,--input", input_file, "File di input")->check(CLI::ExistingFile);
     app.add_option("-o,--output", output_file, "File di output");
     app.add_option("-c,--circuit", netlist_file, "Netlist file")->check(CLI::ExistingFile);
     app.add_option("-v,--max-input-voltage", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(0.15);
     app.add_option("-I,--input-impedance", input_impedance, "Input Impedance")->check(CLI::Range(0, 30000))->default_val(25000);
     app.add_flag("-b,--bypass", bypass, "Bypass Circuit")->default_val(false);
+    app.add_option("-m,--max-iterations", max_iterations, "Max solver's iterations")->default_val(50);
+    app.add_option("-t,--tolerance", tolerance, "Solver's tolerance")->default_val(1e-8);
     
     CLI11_PARSE(app, argc, argv);
 
@@ -253,6 +264,8 @@ int main(int argc, char *argv[]) {
     std::cout << "   Max Input Voltage :" << max_input_voltage << " V" << std::endl;
     std::cout << "   Input Impedance: " << input_impedance << " Ω" << std::endl;
     std::cout << "   Bypass Circuit: " << (bypass ? "True" : "False") << std::endl;
+    std::cout << "   Max iterations: " << max_iterations << std::endl;
+    std::cout << "   Tolerance: " << tolerance << std::endl;
     std::cout << std::endl;
 
     try {
@@ -267,7 +280,7 @@ int main(int argc, char *argv[]) {
         double sample_rate = sf_info.samplerate;
         sf_close(tmp);
 
-        WavFileProcessor processor(netlist_file, sample_rate, max_input_voltage, input_impedance, bypass);
+        WavFileProcessor processor(netlist_file, sample_rate, max_input_voltage, input_impedance, bypass, max_iterations, tolerance);
         if (!processor.process(input_file, output_file))
         {
             return 1;

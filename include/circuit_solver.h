@@ -73,83 +73,83 @@ public:
     }
     
     bool solveDC() {
-    using namespace Eigen;
-    std::cout << "Calcolo punto di lavoro DC" << std::endl;
+        using namespace Eigen;
+        std::cout << "Calcolo punto di lavoro DC" << std::endl;
 
-    MatrixXd Gdc = MatrixXd::Zero(circuit.num_nodes, circuit.num_nodes);
-    VectorXd Idc = VectorXd::Zero(circuit.num_nodes);
-    
-    // Iterazione Newton-Raphson per componenti non lineari
-    VectorXd Vdc = VectorXd::Zero(circuit.num_nodes);
-    
-    for (int iter = 0; iter < max_iterations; iter++) {
-        Gdc.setZero();
-        Idc.setZero();
+        MatrixXd Gdc = MatrixXd::Zero(circuit.num_nodes, circuit.num_nodes);
+        VectorXd Idc = VectorXd::Zero(circuit.num_nodes);
         
-        // Stamp dei componenti con dt=infinito (DC)
-        // Per l'analisi DC:
-        // - Condensatori = circuito aperto (non contribuiscono)
-        // - Induttori = cortocircuito (contribuiscono come resistenze con R=0)
-        for (auto& comp : circuit.components) {
-            if (comp->type == ComponentType::CAPACITOR) {
-                // I condensatori non contribuiscono in DC
-                continue;
-            } else if (comp->type == ComponentType::INDUCTOR) {
-                // Gli induttori sono cortocircuiti in DC
-                // Trattali come resistenze con valore molto piccolo
-/*auto* ind = dynamic_cast<Inductor*>(comp.get());
-                if (ind) {
-                    int n1 = ind->nodes[0];
-                    int n2 = ind->nodes[1];
-                    double g = 1e6; // Conduttanza molto alta (R ≈ 0)
-                    
-                    if (n1 >= 0) Gdc(n1, n1) += g;
-                    if (n2 >= 0) Gdc(n2, n2) += g;
-                    if (n1 >= 0 && n2 >= 0) {
-                        Gdc(n1, n2) -= g;
-                        Gdc(n2, n1) -= g;
+        // Iterazione Newton-Raphson per componenti non lineari
+        VectorXd Vdc = VectorXd::Zero(circuit.num_nodes);
+        
+        for (int iter = 0; iter < max_iterations; iter++) {
+            Gdc.setZero();
+            Idc.setZero();
+            
+            // Stamp dei componenti con dt=infinito (DC)
+            // Per l'analisi DC:
+            // - Condensatori = circuito aperto (non contribuiscono)
+            // - Induttori = cortocircuito (contribuiscono come resistenze con R=0)
+            for (auto& comp : circuit.components) {
+                if (comp->type == ComponentType::CAPACITOR) {
+                    // I condensatori non contribuiscono in DC
+                    continue;
+                } else if (comp->type == ComponentType::INDUCTOR) {
+                    // Gli induttori sono cortocircuiti in DC
+                    // Trattali come resistenze con valore molto piccolo
+                    auto* ind = dynamic_cast<Inductor*>(comp.get());
+                    if (ind) {
+                        int n1 = ind->nodes[0];
+                        int n2 = ind->nodes[1];
+                        double g = 1e6; // Conduttanza molto alta (R ≈ 0)
+                        
+                        if (n1 >= 0) Gdc(n1, n1) += g;
+                        if (n2 >= 0) Gdc(n2, n2) += g;
+                        if (n1 >= 0 && n2 >= 0) {
+                            Gdc(n1, n2) -= g;
+                            Gdc(n2, n1) -= g;
+                        }
                     }
-                }*/
-            } else {
-                // Altri componenti (resistori, diodi, ecc.) stampano normalmente
-                // Passa dt=0 per indicare analisi DC
-                comp->stamp(Gdc, Idc, Vdc, 0.0);
+                } else {
+                    // Altri componenti (resistori, diodi, ecc.) stampano normalmente
+                    // Passa dt=0 per indicare analisi DC
+                    comp->stamp(Gdc, Idc, Vdc, 0.0);
+                }
+            }
+
+            // Nodo di massa forzato
+            Gdc.row(0).setZero();
+            Gdc.col(0).setZero();
+            Gdc(0, 0) = 1.0;
+            Idc(0) = 0.0;
+
+            // Soluzione del sistema
+            VectorXd Vdc_new = Gdc.lu().solve(Idc);
+            
+            // Check convergenza (importante per componenti non lineari)
+            double error = (Vdc_new - Vdc).norm();
+            Vdc = Vdc_new;
+            
+            if (error < tolerance) {
+                // Convergenza raggiunta
+                std::cout << "   Convergenza raggiunta dopo " << (iter + 1) << " iterazioni" << std::endl;
+                std::cout << "   Tensioni nodali:" << std::endl;
+                for (int i = 0; i < circuit.num_nodes; ++i) {
+                    std::cout << "      Nodo " << i << ": " << Vdc(i) << " V" << std::endl;
+                }
+                
+                std::cout << std::endl;
+                
+                // Copia le tensioni DC come condizioni iniziali
+                V = Vdc;
+                return true;
             }
         }
-
-        // Nodo di massa forzato
-        Gdc.row(0).setZero();
-        Gdc.col(0).setZero();
-        Gdc(0, 0) = 1.0;
-        Idc(0) = 0.0;
-
-        // Soluzione del sistema
-        VectorXd Vdc_new = Gdc.lu().solve(Idc);
         
-        // Check convergenza (importante per componenti non lineari)
-        double error = (Vdc_new - Vdc).norm();
-        Vdc = Vdc_new;
-        
-        if (error < tolerance) {
-            // Convergenza raggiunta
-            std::cout << "  Convergenza raggiunta dopo " << (iter + 1) << " iterazioni" << std::endl;
-            std::cout << "  Tensioni nodali:" << std::endl;
-            for (int i = 0; i < circuit.num_nodes; ++i) {
-                std::cout << "      Nodo " << i << ": " << Vdc(i) << " V" << std::endl;
-            }
-            
-            std::cout << std::endl;
-            
-            // Copia le tensioni DC come condizioni iniziali
-            V = Vdc;
-            return true;
-        }
+        // Non convergenza
+        std::cerr << "ERRORE: Analisi DC non convergente dopo " << max_iterations << " iterazioni" << std::endl;
+        return false;
     }
-    
-    // Non convergenza
-    std::cerr << "ERRORE: Analisi DC non convergente dopo " << max_iterations << " iterazioni" << std::endl;
-    return false;
-}
 
     void openProbeFile(const std::string& filename = "probe.csv") {
         logFile.open(filename);

@@ -286,16 +286,16 @@ int main(int argc, char *argv[]) {
     CLI11_PARSE(app, argc, argv);
 
     std::cout << "Input Parameters" << std::endl;
-    std::cout << "   Input file: " << input_file << std::endl;
-    std::cout << "   Input frequency: " << input_frequency << std::endl;
-    std::cout << "   Input duration: " << input_duration << std::endl;
-    std::cout << "   Sample rate: " << sample_rate << std::endl;
-    std::cout << "   Output file: " << output_file << std::endl;
-    std::cout << "   Netlist file: " << netlist_file << std::endl;
-    std::cout << "   Max Input Voltage :" << max_input_voltage << " V" << std::endl;
+    std::cout << "   Input File: " << input_file << std::endl;
+    std::cout << "   Input Frequency: " << input_frequency << std::endl;
+    std::cout << "   Input Duration: " << input_duration << std::endl;
+    std::cout << "   Sample Sate: " << sample_rate << std::endl;
+    std::cout << "   Output File: " << output_file << std::endl;
+    std::cout << "   Netlist File: " << netlist_file << std::endl;
+    std::cout << "   Max Input Voltage: " << max_input_voltage << " V" << std::endl;
     std::cout << "   Input Impedance: " << input_impedance << " Ω" << std::endl;
     std::cout << "   Bypass Circuit: " << (bypass ? "True" : "False") << std::endl;
-    std::cout << "   Max iterations: " << max_iterations << std::endl;
+    std::cout << "   Max Iterations: " << max_iterations << std::endl;
     std::cout << "   Tolerance: " << tolerance << std::endl;
     std::cout << std::endl;
 

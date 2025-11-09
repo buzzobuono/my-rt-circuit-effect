@@ -1,7 +1,7 @@
 
 .title Test Inductor
 
-L1 1 2 25m      
+L1 1 2 1      
 Rload 2 0 1k    
 
 .input 1

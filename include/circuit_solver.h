@@ -1,13 +1,13 @@
 #ifndef CIRCUIT_SOLVER_H
 #define CIRCUIT_SOLVER_H
 
+#include "circuit.h"
+
 #include <iostream>
 #include <fstream>
 #include <memory>
 #include <map>
 #include <Eigen/Dense>
-
-#include "circuit.h"
 
 class CircuitSolver {
 
@@ -20,7 +20,9 @@ private:
     double tolerance;
     int input_impedance;
     int max_non_convergence_warning;
-
+    std::ofstream logFile;
+    bool logging_enabled = false;
+    
     bool warmUp(double warmup_duration) {
         std::cout << "Circuit WarmUp" << std::endl;
         int warmup_samples = static_cast<int>(warmup_duration / dt);
@@ -148,6 +150,65 @@ public:
     return false;
 }
 
+    void openProbeFile(const std::string& filename = "probe.csv") {
+        logFile.open(filename);
+        if (!logFile.is_open()) {
+            throw std::runtime_error("Cannot open probe file: " + filename);
+        }
+        
+        logging_enabled = true;
+        
+        logFile << "time";
+        for (auto& p : circuit.probes) {
+            if (p.type == ProbeTarget::Type::VOLTAGE) {
+                logFile << ";V(" << p.name << ")";
+            } else if (p.type == ProbeTarget::Type::CURRENT) {
+                logFile << ";I(" << p.name << ")";
+            }
+        }
+        logFile << "\n";
+        
+        std::cout << "Probe file opened: " << filename << std::endl;
+    }
+    
+    void logProbes(double time) {
+        if (!logging_enabled) return;
+        
+        logFile << std::fixed << std::setprecision(9) << time;
+        
+        for (auto& p : circuit.probes) {
+            if (p.type == ProbeTarget::Type::VOLTAGE) {
+                int node = std::stoi(p.name);
+                if (node < circuit.num_nodes) {
+                    logFile << ";" << V(node);
+                } else {
+                    logFile << ";NaN";
+                }
+            } else if (p.type == ProbeTarget::Type::CURRENT) {
+                double current = 0.0;
+                bool found = false;
+                for (auto& comp : circuit.components) {
+                    if (comp->name == p.name) {
+                        current = comp->getCurrent();
+                        found = true;
+                        break;
+                    }
+                }
+                logFile << ";" << (found ? current : NAN);
+            }
+        }
+        
+        logFile << "\n";
+    }
+    
+    void closeProbeFile() {
+        if (logging_enabled && logFile.is_open()) {
+            logFile.close();
+            logging_enabled = false;
+            std::cout << "Probe file closed." << std::endl;
+        }
+    }
+    
     bool solve(double input_voltage) {
         static int sample_count = 0;
 

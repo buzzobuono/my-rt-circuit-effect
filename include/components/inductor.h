@@ -111,7 +111,7 @@ public:
     }
     
     // Metodi di accesso per diagnostica
-    double getCurrent() const { return i_prev; }
+    double getCurrent() const override { return i_prev; }
     double getInductance() const { return L; }
     double getDCResistance() const { return R_dc; }
 };

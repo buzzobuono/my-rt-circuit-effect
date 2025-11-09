@@ -25,20 +25,27 @@
 #include "components/wire.h"
 
 #include <Eigen/Dense>
-#include <Eigen/LU>  
+#include <Eigen/LU>
+
+struct ProbeTarget {
+    enum class Type { VOLTAGE, CURRENT };
+    Type type;
+    std::string name;  // nodo (es. "1") o componente (es. "L1")
+};
 
 class Circuit {
+    
 public:
     std::vector<std::unique_ptr<Component>> components;
     int num_nodes;
     int input_node;
     int output_node;
-    std::vector<int> probe_nodes;
     double warmup_duration = 0;
     std::map<std::string, double> initial_conditions;
     std::vector<std::pair<int, std::string>> pending_params;
     std::map<int, Potentiometer*> param_map;
-
+    std::vector<ProbeTarget> probes;
+    
     Circuit() : num_nodes(0), output_node(-1) {}
     
     bool loadNetlist(const std::string& filename) {
@@ -203,10 +210,20 @@ public:
                         iss >> output_node;
                         std::cout << "   Directive Output Node: " << output_node << std::endl;
                     } else if (directive == ".probe") {
-                        int probe_node;
-                        iss >> probe_node;
-                        std::cout << "   Directive Probe Node: " << probe_node << std::endl;
-                        probe_nodes.push_back(probe_node);
+                        std::string token;
+                        while (iss >> token) {
+                            if (token[0] == 'V' && token[1] == '(') {
+                                std::string node_str = token.substr(2, token.size() - 3);
+                                probes.push_back({ProbeTarget::Type::VOLTAGE, node_str});
+                                std::cout << "   Probe voltage node: " << node_str << std::endl;
+                            } else if (token[0] == 'I' && token[1] == '(') {
+                                std::string comp_str = token.substr(2, token.size() - 3);
+                                probes.push_back({ProbeTarget::Type::CURRENT, comp_str});
+                                std::cout << "   Probe current of: " << comp_str << std::endl;
+                            } else {
+                                std::cerr << "   Warning: Unknown probe token " << token << std::endl;
+                            }
+                        }
                     } else if (directive == ".warmup") {
                         iss >> warmup_duration;
                         std::cout << "   Directive WarmUp Duration: " << warmup_duration << "sec" << std::endl;

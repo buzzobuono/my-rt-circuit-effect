@@ -23,6 +23,7 @@ public:
                       const Eigen::VectorXd& V, double dt) = 0;
     virtual void updateHistory(const Eigen::VectorXd& V, double dt) {}
     virtual void reset() {}
+    virtual double getCurrent() const { return 0.0; }
 };
 
 #endif

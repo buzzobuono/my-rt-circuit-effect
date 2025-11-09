@@ -1,0 +1,11 @@
+
+.title Test Inductor RL Filter
+
+* Resistore serie
+R1 1 2 470
+
+* Induttore con resistenza DC (pickup-like)
+L1 2 0 1000
+
+.input 1
+.output 2

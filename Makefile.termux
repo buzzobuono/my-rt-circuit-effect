@@ -10,6 +10,7 @@ PLUGIN_SO = $(PLUGIN_NAME).so
 LV2_BUNDLE = $(PLUGIN_NAME).lv2
 USER_LV2_DIR = $(HOME)/.lv2
 INSTALL_DIR = $(USER_LV2_DIR)/$(LV2_BUNDLE)
+BIN_INSTALL_DIR = $(HOME)/bin
 
 # LV2 compilation flags
 LV2_CXXFLAGS = -fPIC -shared
@@ -31,7 +32,6 @@ dc_analisys: clean_dc_analisys
 
 lv2: clean_lv2
 	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES) src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG}
-
 
 install-lv2: lv2
 	@mkdir -p $(INSTALL_DIR)
@@ -67,6 +67,28 @@ test-lv2: install-lv2
 		echo "⚠ lv2ls not available (install lilv-utils)"; \
 	fi
 	@echo "✓ Test complete"
+
+install: all
+	@mkdir -p $(BIN_INSTALL_DIR)
+	@cp bin/wav_processor $(BIN_INSTALL_DIR)/
+	@cp bin/sine_input_processor $(BIN_INSTALL_DIR)/
+	@cp bin/wav_streaming_processor $(BIN_INSTALL_DIR)/
+	@cp bin/dc_analisys $(BIN_INSTALL_DIR)/
+	@chmod +x $(BIN_INSTALL_DIR)/wav_processor
+	@chmod +x $(BIN_INSTALL_DIR)/sine_input_processor
+	@chmod +x $(BIN_INSTALL_DIR)/wav_streaming_processor
+	@chmod +x $(BIN_INSTALL_DIR)/dc_analisys
+	@echo "✓ Binaries installed to ~/bin"
+	@echo "✓ Make sure ~/bin is in your PATH"
+
+# Uninstall binaries from ~/bin
+uninstall:
+	@rm -f $(BIN_INSTALL_DIR)/wav_processor
+	@rm -f $(BIN_INSTALL_DIR)/sine_input_processor
+	@rm -f $(BIN_INSTALL_DIR)/wav_streaming_processor
+	@rm -f $(BIN_INSTALL_DIR)/dc_analisys
+	@echo "✓ Binaries removed from ~/bin"
+
 
 clean_wav_processor:
 	@rm -f bin/wav_processor

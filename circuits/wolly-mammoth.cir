@@ -11,7 +11,8 @@ Q2 2 1 5 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
 
 R2 3 4 100k
 Ppinch 4 5 8 500k 0.5 LIN
-Rwire1 8 5 1m
+*Rwire1 8 5 1m
+W1 8 5
 
 C6 5 6 100e-6
 R1 8 0 2.2k

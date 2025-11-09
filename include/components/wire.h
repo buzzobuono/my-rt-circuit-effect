@@ -6,6 +6,7 @@
 #include <Eigen/Dense>
 
 #include "component.h"
+#include "components/resistor.h"
 
 class Wire : public Component {
 public:
@@ -20,19 +21,10 @@ public:
     
     void stamp(Eigen::MatrixXd& G, Eigen::VectorXd& I, 
                const Eigen::VectorXd& V, double dt) override {
-        // Conduttanza molto alta per simulare cortocircuito
-        const double g = 1e12;
-        
+                   
         int n1 = nodes[0], n2 = nodes[1];
-        
-        if (n1 != 0) {
-            G(n1, n1) += g;
-            if (n2 != 0) G(n1, n2) -= g;
-        }
-        if (n2 != 0) {
-            G(n2, n2) += g;
-            if (n1 != 0) G(n2, n1) -= g;
-        }
+        Resistor r(name , n1, n2, 1e-3);
+        r.stamp(G, I, V, dt);
     }
 };
 

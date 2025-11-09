@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPICE Netlist Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 0;
+            height: calc(100vh - 200px);
+            min-height: 600px;
+        }
+
+        .input-panel {
+            background: #f8f9fa;
+            padding: 25px;
+            border-right: 2px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-panel label {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .netlist-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            resize: none;
+            background: white;
+            transition: border-color 0.3s;
+        }
+
+        .netlist-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .layout-select {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+        }
+
+        .graph-panel {
+            position: relative;
+            background: #fafafa;
+        }
+
+        #cy {
+            width: 100%;
+            height: 100%;
+        }
+
+        .stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-size: 0.9em;
+            z-index: 1000;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin: 5px 0;
+        }
+
+        .stats-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .stats-value {
+            color: #667eea;
+            font-weight: 700;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .legend-title {
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+            font-size: 0.85em;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid #333;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        @media (max-width: 1200px) {
+            .content {
+                grid-template-columns: 1fr;
+                grid-template-rows: 300px 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ SPICE Netlist Visualizer</h1>
+            <p>Visualizza circuiti elettronici da netlist SPICE</p>
+        </div>
+        
+        <div class="content">
+            <div class="input-panel">
+                <label>Netlist SPICE:</label>
+                <textarea class="netlist-input" id="netlistInput" placeholder="Incolla qui la tua netlist SPICE...
+Esempio:
+R1 1 0 1k
+C1 1 2 10u
+V1 1 0 DC 5V"></textarea>
+                
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="visualizeCircuit()">🔍 Visualizza Circuito</button>
+                    
+                    <select class="layout-select" id="layoutSelect" onchange="changeLayout()">
+                        <option value="cose">Layout: COSE (Force-Directed)</option>
+                        <option value="circle">Layout: Circle</option>
+                        <option value="grid">Layout: Grid</option>
+                        <option value="breadthfirst">Layout: Breadthfirst</option>
+                        <option value="concentric">Layout: Concentric</option>
+                    </select>
+                </div>
+                
+                <div class="error" id="error"></div>
+            </div>
+            
+            <div class="graph-panel">
+                <div id="cy"></div>
+                
+                <!--div class="stats" id="stats" style="display: none;">
+                    <div class="stats-item">
+                        <span class="stats-label">Nodi:</span>
+                        <span class="stats-value" id="nodeCount">0</span>
+                    </div>
+                    <div class="stats-item">
+                        <span class="stats-label">Componenti:</span>
+                        <span class="stats-value" id="componentCount">0</span>
+                    </div>
+                </div-->
+                
+                <!--div class="legend">
+                    <div class="legend-title">Legenda Componenti</div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #e74c3c;"></div>
+                        <span>Resistenze (R)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3498db;"></div>
+                        <span>Condensatori (C)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2ecc71;"></div>
+                        <span>Induttori (L)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #f39c12;"></div>
+                        <span>Sorgenti (V, I)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #9b59b6;"></div>
+                        <span>Transistor (Q)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #1abc9c;"></div>
+                        <span>Potentiometri (P)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #34495e;"></div>
+                        <span>Wire (W)</span>
+                    </div>
+                </div-->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cy;
+        
+        function initCytoscape() {
+            cy = cytoscape({
+                container: document.getElementById('cy'),
+                
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#667eea',
+                            'label': 'data(id)',
+                            'color': '#fff',
+                            'text-valign': 'center',
+                            'text-halign': 'center',
+                            'font-size': '16px',
+                            'font-weight': 'bold',
+                            'width': '50px',
+                            'height': '50px',
+                            'border-width': '3px',
+                            'border-color': '#fff',
+                            'text-outline-color': '#667eea',
+                            'text-outline-width': '2px'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 4,
+                            'line-color': 'data(color)',
+                            'target-arrow-color': '#ccc',
+                            'curve-style': 'bezier',
+                            'label': 'data(label)',
+                            'font-size': '12px',
+                            'text-rotation': 'autorotate',
+                            'text-margin-y': -10,
+                            'text-background-color': '#fff',
+                            'text-background-opacity': 0.8,
+                            'text-background-padding': '3px',
+                            'color': '#333',
+                            'font-weight': '600'
+                        }
+                    }
+                ],
+                
+                layout: {
+                    name: 'cose',
+                    animate: true,
+                    animationDuration: 500
+                }
+            });
+        }
+
+        function getComponentColor(type) {
+            const colors = {
+                'R': '#e74c3c',  // Rosso per resistenze
+                'C': '#3498db',  // Blu per condensatori
+                'L': '#2ecc71',  // Verde per induttori
+                'V': '#f39c12',  // Arancione per sorgenti di tensione
+                'I': '#f39c12',  // Arancione per sorgenti di corrente
+                'Q': '#9b59b6',  // Viola per transistor
+                'P': '#1abc9c',  // Turchese per potentiometri
+                'W': '#34495e'   // Grigio scuro per wire
+            };
+            return colors[type] || '#95a5a6';
+        }
+
+        function parseNetlist(netlist) {
+            const lines = netlist.split('\n');
+            const components = [];
+            const nodes = new Set();
+            
+            for (let line of lines) {
+                line = line.trim();
+                
+                // Ignora linee vuote, commenti e direttive
+                if (!line || line.startsWith('*') || line.startsWith('.')) {
+                    continue;
+                }
+                
+                const parts = line.split(/\s+/);
+                if (parts.length < 3) continue;
+                
+                const name = parts[0];
+                const type = name.charAt(0).toUpperCase();
+                
+                let node1, node2, value;
+                
+                // Gestione transistor (hanno 3 terminali)
+                if (type === 'Q') {
+                    node1 = parts[1]; // Collector
+                    node2 = parts[2]; // Base
+                    const node3 = parts[3]; // Emitter
+                    value = parts[4] || '';
+                    
+                    nodes.add(node1);
+                    nodes.add(node2);
+                    nodes.add(node3);
+                    
+                    // Crea due edge per il transistor
+                    components.push({
+                        name: name,
+                        type: type,
+                        node1: node2,
+                        node2: node1,
+                        value: 'C',
+                        color: getComponentColor(type)
+                    });
+                    components.push({
+                        name: name,
+                        type: type,
+                        node1: node2,
+                        node2: node3,
+                        value: 'E',
+                        color: getComponentColor(type)
+                    });
+                    continue;
+                }
+                
+                // Componenti standard a 2 terminali
+                node1 = parts[1];
+                node2 = parts[2];
+                value = parts[3] || '';
+                
+                nodes.add(node1);
+                nodes.add(node2);
+                
+                components.push({
+                    name: name,
+                    type: type,
+                    node1: node1,
+                    node2: node2,
+                    value: value,
+                    color: getComponentColor(type)
+                });
+            }
+            
+            return { components, nodes: Array.from(nodes) };
+        }
+
+        function visualizeCircuit() {
+            const netlist = document.getElementById('netlistInput').value;
+            const errorDiv = document.getElementById('error');
+            
+            errorDiv.style.display = 'none';
+            
+            if (!netlist.trim()) {
+                errorDiv.textContent = 'Inserisci una netlist valida!';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            try {
+                const { components, nodes } = parseNetlist(netlist);
+                
+                if (nodes.length === 0 || components.length === 0) {
+                    errorDiv.textContent = 'Nessun componente trovato nella netlist!';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                
+                // Crea elementi per Cytoscape
+                const elements = [];
+                
+                // Aggiungi nodi
+                nodes.forEach(node => {
+                    elements.push({
+                        data: { id: node }
+                    });
+                });
+                
+                // Aggiungi edge (componenti)
+                components.forEach(comp => {
+                    elements.push({
+                        data: {
+                            id: `${comp.name}_${comp.node1}_${comp.node2}`,
+                            source: comp.node1,
+                            target: comp.node2,
+                            label: `${comp.name}\n${comp.value}`,
+                            color: comp.color
+                        }
+                    });
+                });
+                
+                // Aggiorna il grafo
+                cy.elements().remove();
+                cy.add(elements);
+                
+                // Applica layout
+                const layoutName = document.getElementById('layoutSelect').value;
+                cy.layout({
+                    name: layoutName,
+                    animate: true,
+                    animationDuration: 500,
+                    fit: true,
+                    padding: 50
+                }).run();
+                
+                // Aggiorna statistiche
+                //document.getElementById('nodeCount').textContent = nodes.length;
+                //document.getElementById('componentCount').textContent = components.length;
+                //document.getElementById('stats').style.display = 'block';
+                
+            } catch (error) {
+                errorDiv.textContent = 'Errore nel parsing della netlist: ' + error.message;
+                errorDiv.style.display = 'block';
+                console.error(error);
+            }
+        }
+
+        function changeLayout() {
+            const layoutName = document.getElementById('layoutSelect').value;
+            cy.layout({
+                name: layoutName,
+                animate: true,
+                animationDuration: 500,
+                fit: true,
+                padding: 50
+            }).run();
+        }
+
+        // Inizializza Cytoscape all'avvio
+        window.onload = function() {
+            initCytoscape();
+            
+            // Carica esempio di netlist
+            const exampleNetlist = `.title Woolly Mammoth
+
+VCC 9 0 DC 9V
+
+* two stage amplifier
+
+R3 9 1 51k
+R4 9 2 20k
+Q1 1 3 0 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
+Q2 2 1 5 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
+
+R2 3 4 100k
+Ppinch 4 5 8 500k 0.5 LIN
+W1 8 5
+
+C6 5 6 100e-6
+R1 8 0 2.2k
+Pwool 6 11 0 2k 0.8 LIN
+
+C1 7 3 0.22e-6
+C2 3 0 10e-9
+
+* tone stack
+
+C3 2 10 10e-9
+C5 2 11 100e-6
+R5 11 10 10k
+R5b 11 10 15k
+
+R6 11 12 5.1k
+C4 12 0 7.4e-9
+C4b 12 0 220e-9
+
+Peq 12 10 13 10k 0.8 LIN
+Pvol 13 0 14 10k .5 LIN
+
+.input 7
+.output 14
+.warmup 60
+.param 0 Ppinch
+.param 1 Pwool
+.param 2 Peq
+.param 3 Pvol`;
+            
+            document.getElementById('netlistInput').value = exampleNetlist;
+        };
+    </script>
+</body>
+</html>

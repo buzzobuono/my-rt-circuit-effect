@@ -20,6 +20,7 @@
 #include "components/diode.h"
 #include "components/bjt.h"
 #include "components/mosfet.h"
+#include "components/inductor.h"
 #include "components/potentiometer.h"
 #include "components/wire.h"
 
@@ -83,6 +84,17 @@ public:
                     v *= parseUnit(unit);
                     components.push_back(std::make_unique<Capacitor>(comp_name, n1, n2, v));
                     std::cout << "   Component Capacitor name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" v=" << v << std::endl;
+                    max_node = std::max(max_node, std::max(n1, n2));
+                    break;
+                }
+                case 'L': {
+                    int n1, n2;
+                    double l;
+                    std::string unit;
+                    iss >> n1 >> n2 >> l >> unit;
+                    l *= parseUnit(unit);
+                    components.push_back(std::make_unique<Inductor>(comp_name, n1, n2, l, 100));
+                    std::cout << "   Component Capacitor name=" << comp_name << " n1=" << n1 << " n2=" << n2 <<" l=" << l << std::endl;
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;
                 }
@@ -156,7 +168,7 @@ public:
                     int n1, n2;
                     iss >> n1 >> n2;
                     auto wire = std::make_unique<Wire>(comp_name, n1, n2);
-                    std::cout << "   Component Wirw name=" << comp_name << " n1=" << n1 << " n2=" << n2 << std::endl;
+                    std::cout << "   Component Wire name=" << comp_name << " n1=" << n1 << " n2=" << n2 << std::endl;
                     components.push_back(std::move(wire));
                     max_node = std::max(max_node, std::max(n1, n2));
                     break;

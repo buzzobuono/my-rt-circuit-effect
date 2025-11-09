@@ -1,11 +1,9 @@
 
-.title Test Inductor RL Filter
+.title Test Inductor
 
-* Resistore serie
-R1 1 2 470
-
-* Induttore con resistenza DC (pickup-like)
-L1 2 0 1000
+L1 1 2 25m      
+Rload 2 0 1k    
 
 .input 1
 .output 2
+.probe V(1) V(2) I(L1)

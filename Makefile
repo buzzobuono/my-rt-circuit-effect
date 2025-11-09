@@ -10,18 +10,16 @@ PLUGIN_SO = $(PLUGIN_NAME).so
 LV2_BUNDLE = $(PLUGIN_NAME).lv2
 USER_LV2_DIR = $(HOME)/.lv2
 INSTALL_DIR = $(USER_LV2_DIR)/$(LV2_BUNDLE)
+BIN_INSTALL_DIR = $(HOME)/bin
 
 # LV2 compilation flags
 LV2_CXXFLAGS = -fPIC -shared
 LV2_INCLUDES = $(shell pkg-config --cflags lv2 2>/dev/null || echo "")
 
-all: wav_processor sine_input_processor wav_streaming_processor dc_analisys lv2
+all: wav_processor wav_streaming_processor dc_analisys lv2
 
 wav_processor: clean_wav_processor create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/wav_processor.cpp -o bin/wav_processor $(LIBS_SNDFILE) ${DEBUG}
-
-sine_input_processor: clean_sine_input_processor create_bin_folder
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/sine_input_processor.cpp -o bin/sine_input_processor ${DEBUG}
 
 wav_streaming_processor: clean_wav_streaming_processor create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/wav_streaming_processor.cpp -o bin/wav_streaming_processor $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${DEBUG}
@@ -67,11 +65,28 @@ test-lv2: install-lv2
 	fi
 	@echo "✓ Test complete"
 
+install: all
+	@mkdir -p $(BIN_INSTALL_DIR)
+	@cp bin/wav_processor $(BIN_INSTALL_DIR)/
+	@cp bin/wav_streaming_processor $(BIN_INSTALL_DIR)/
+	@cp bin/dc_analisys $(BIN_INSTALL_DIR)/
+	@chmod +x $(BIN_INSTALL_DIR)/wav_processor
+	@chmod +x $(BIN_INSTALL_DIR)/sine_input_processor
+	@chmod +x $(BIN_INSTALL_DIR)/wav_streaming_processor
+	@chmod +x $(BIN_INSTALL_DIR)/dc_analisys
+	@echo "✓ Binaries installed to ~/bin"
+	@echo "✓ Make sure ~/bin is in your PATH"
+
+# Uninstall binaries from ~/bin
+uninstall:
+	@rm -f $(BIN_INSTALL_DIR)/wav_processor
+	@rm -f $(BIN_INSTALL_DIR)/wav_streaming_processor
+	@rm -f $(BIN_INSTALL_DIR)/dc_analisys
+	@echo "✓ Binaries removed from ~/bin"
+
+
 clean_wav_processor:
 	@rm -f bin/wav_processor
-
-clean_sine_input_processor:
-	@rm -f bin/sine_input_processor
 
 clean_wav_streaming_processor:
 	@rm -f bin/wav_streaming_processor

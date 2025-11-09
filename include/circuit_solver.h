@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <memory>
 #include <map>
 #include <Eigen/Dense>

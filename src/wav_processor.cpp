@@ -17,7 +17,7 @@ private:
     std::unique_ptr<CircuitSolver> solver;
     double sample_rate;
     int input_frequency;
-    int input_duration;
+    float input_duration;
     float max_input_voltage;
     int input_impedance;
     bool bypass;
@@ -28,7 +28,7 @@ public:
     WavFileProcessor(const std::string &netlist_file,
                      double sample_rate,
                      int input_frequency,
-                     int input_duration,
+                     float input_duration,
                      float max_input_voltage,
                      int input_impedance,
                      bool bypass,
@@ -164,7 +164,8 @@ public:
         
         std::cout << std::endl;
 
-        writeWav(signalOut, output_file, sample_rate);
+        if (!output_file.empty())
+            writeWav(signalOut, output_file, sample_rate);
         return true;
     }
 
@@ -259,8 +260,8 @@ int main(int argc, char *argv[]) {
     CLI::App app{"Pedal Circuit Simulator"};
     
     std::string input_file;
-    float input_frequency;
-    int input_duration;
+    float input_frequency = 440.0f;
+    float input_duration = 1.0f;
     float max_input_voltage;
     int input_impedance;
     int sample_rate = 44100;
@@ -271,9 +272,9 @@ int main(int argc, char *argv[]) {
     double tolerance;
     
     app.add_option("-i,--input", input_file, "Input file")->check(CLI::ExistingFile);
-    app.add_option("-f,--frequency", input_frequency, "Input frequency");
-    app.add_option("-d,--duration", input_duration, "Input duration");
-    app.add_option("-s,--sample-rate", sample_rate, "Sample rate");
+    app.add_option("-f,--frequency", input_frequency, "Input frequency")->default_val(input_frequency);
+    app.add_option("-d,--duration", input_duration, "Input duration")->default_val(input_duration);
+    app.add_option("-s,--sample-rate", sample_rate, "Sample rate")->default_val(sample_rate);
     app.add_option("-o,--output", output_file, "Output file");
     app.add_option("-c,--circuit", netlist_file, "Netlist file")->check(CLI::ExistingFile);
     app.add_option("-v,--max-input-voltage", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(0.15);

@@ -15,9 +15,10 @@ class WavFileProcessor
 private:
     Circuit circuit;
     std::unique_ptr<CircuitSolver> solver;
+    std::string analysis_type;
     double sample_rate;
     int input_frequency;
-    float input_duration;
+    int input_duration;
     float max_input_voltage;
     int input_impedance;
     bool bypass;
@@ -25,17 +26,19 @@ private:
     double tolerance;
 
 public:
-    WavFileProcessor(const std::string &netlist_file,
+    WavFileProcessor(std::string analysis_type,
+                     const std::string &netlist_file,
                      double sample_rate,
                      int input_frequency,
-                     float input_duration,
+                     int input_duration,
                      float max_input_voltage,
                      int input_impedance,
                      bool bypass,
                      int max_iterations,
                      double tolerance
                     )
-        : sample_rate(sample_rate),
+        : analysis_type(analysis_type),
+          sample_rate(sample_rate),
           input_frequency(input_frequency),
           input_duration(input_duration),
           max_input_voltage(max_input_voltage),
@@ -53,120 +56,129 @@ public:
 
     bool process(const std::string &input_file, const std::string &output_file)
     {
-        std::vector<float> signalIn;
-        if (!input_file.empty()) { 
-           // Open Input WAV
-           SF_INFO sfInfo;
-           sfInfo.format = 0;
-           SNDFILE* file = sf_open(input_file.c_str(), SFM_READ, &sfInfo);
-           
-           if (!file) {
-               std::cerr << "Errore apertura WAV: " << sf_strerror(file) << std::endl;
-               return false;
-           }
-           
-           std::cout << "Input File Format" << std::endl;
-           printFileFormat(input_file);
-           
-           if (sample_rate) sample_rate = sfInfo.samplerate;
-           
-           // Leggi tutti i sample
-           std::vector<float> buffer(sfInfo.frames * sfInfo.channels);
-           sf_count_t numFrames = sf_readf_float(file, buffer.data(), sfInfo.frames);
-           sf_close(file);
-           
-           if (numFrames != sfInfo.frames) {
-               std::cerr << "Errore lettura sample" << std::endl;
-               return false;
-           }
-           
-           // Estrai canale sinistro
-           signalIn.resize(numFrames, 0.0f);
-           for (sf_count_t i = 0; i < numFrames; i++) {
-               signalIn[i] = buffer[i * sfInfo.channels];
-           }
-        } else if (input_frequency != 0) {
-            size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
-            signalIn.resize(total_samples, 0.0f);
-            for (size_t i = 0; i < total_samples; ++i) {
-                double t = i / sample_rate;
-                signalIn[i] = max_input_voltage * std::sin(2.0 * M_PI * input_frequency * t);
-            }
-        }
-        
-        // Rimuovi DC offset
-        float mean = 0.0f;
-        for (float s : signalIn) mean += s;
-        mean /= signalIn.size();
-        
-        for (float& s : signalIn) s -= mean;
-        
-        // Normalizza in Volt
-        float maxNormalized = 0.0f;
-        for (float s : signalIn) {
-            maxNormalized = std::max(maxNormalized, std::abs(s));
-        }
-        
-        float scale = 1;
-        if (maxNormalized > 1e-10f) {
-            scale = max_input_voltage / maxNormalized;
-        }
-
-        for (float& s : signalIn) s *= scale;
-
-        solver->initialize();
-        
-        std::vector<float> signalOut(signalIn.size());
-
-        float peak_in = 0.0f, peak_out = 0.0f;
-        float rms_in = 0.0f, rms_out = 0.0f;
-
-        solver->openProbeFile("probe.csv");
-        
-        for (size_t i = 0; i < signalIn.size(); i++) {
-            if (!bypass) {
-                signalOut[i] = 0;
-                if (solver->solve(signalIn[i])) {
-                    signalOut[i] = solver->getOutputVoltage();
+        if (analysis_type == "DC") {
+            solver->solveDC();
+            return true;
+        } else if (analysis_type == "TRAN") {
+            std::vector<float> signalIn;
+            if (!input_file.empty()) { 
+                // Open Input WAV
+                SF_INFO sfInfo;
+                sfInfo.format = 0;
+                SNDFILE* file = sf_open(input_file.c_str(), SFM_READ, &sfInfo);
+                
+                if (!file) {
+                    std::cerr << "Errore apertura WAV: " << sf_strerror(file) << std::endl;
+                    return false;
                 }
-            } else {
-                signalOut[i] = signalIn[i];
+                
+                std::cout << "Input File Format" << std::endl;
+                printFileFormat(input_file);
+                
+                if (sample_rate) sample_rate = sfInfo.samplerate;
+                
+                // Leggi tutti i sample
+                std::vector<float> buffer(sfInfo.frames * sfInfo.channels);
+                sf_count_t numFrames = sf_readf_float(file, buffer.data(), sfInfo.frames);
+                sf_close(file);
+                
+                if (numFrames != sfInfo.frames) {
+                    std::cerr << "Errore lettura sample" << std::endl;
+                    return false;
+                }
+                
+                // Estrai canale sinistro
+                signalIn.resize(numFrames, 0.0f);
+                for (sf_count_t i = 0; i < numFrames; i++) {
+                    signalIn[i] = buffer[i * sfInfo.channels];
+                }
+            } else if (input_frequency != 0) {
+                size_t total_samples = static_cast<size_t>(sample_rate * input_duration);
+                signalIn.resize(total_samples, 0.0f);
+                for (size_t i = 0; i < total_samples; ++i) {
+                    double t = i / sample_rate;
+                    signalIn[i] = max_input_voltage * std::sin(2.0 * M_PI * input_frequency * t);
+                }
             }
             
-            solver->logProbes(i * 1.0 / sample_rate);
+            // Rimuovi DC offset
+            float mean = 0.0f;
+            for (float s : signalIn) mean += s;
+            mean /= signalIn.size();
             
-            // Update statistics
-            peak_in = std::max(peak_in, std::abs(signalIn[i]));
-            peak_out = std::max(peak_out, std::abs(signalOut[i]));
-            rms_in += signalIn[i] * signalIn[i];
-            rms_out += signalOut[i] * signalOut[i];
+            for (float& s : signalIn) s -= mean;
+            
+            // Normalizza in Volt
+            float maxNormalized = 0.0f;
+            for (float s : signalIn) {
+                maxNormalized = std::max(maxNormalized, std::abs(s));
+            }
+            
+            float scale = 1;
+            if (maxNormalized > 1e-10f) {
+                scale = max_input_voltage / maxNormalized;
+            }
+            
+            for (float& s : signalIn) s *= scale;
+            
+            solver->initialize();
+            
+            std::vector<float> signalOut(signalIn.size());
+            
+            float peak_in = 0.0f, peak_out = 0.0f;
+            float rms_in = 0.0f, rms_out = 0.0f;
+            
+            solver->openProbeFile("probe.csv");
+            
+            for (size_t i = 0; i < signalIn.size(); i++) {
+                if (!bypass) {
+                    signalOut[i] = 0;
+                    if (solver->solve(signalIn[i])) {
+                        signalOut[i] = solver->getOutputVoltage();
+                    }
+                } else {
+                    signalOut[i] = signalIn[i];
+                }
+                
+                solver->logProbes(i * 1.0 / sample_rate);
+                
+                // Update statistics
+                peak_in = std::max(peak_in, std::abs(signalIn[i]));
+                peak_out = std::max(peak_out, std::abs(signalOut[i]));
+                rms_in += signalIn[i] * signalIn[i];
+                rms_out += signalOut[i] * signalOut[i];
+            }
+            
+            solver->closeProbeFile();
+            
+            rms_in = std::sqrt(rms_in / signalIn.size());
+            rms_out = std::sqrt(rms_out / signalIn.size());
+            
+            float outputPeak = 0.0f;
+            for (float v : signalOut) {
+                outputPeak = std::max(outputPeak, std::abs(v));
+            }
+            
+            solver->printDCOperatingPoint();
+            
+            // Print statistics
+            std::cout << "Audio Statistics:" << std::endl;
+            std::cout << "  Mean Input Signal " << mean << std::endl;
+            std::cout << "  Max Normalized " << maxNormalized << " V, Scale Factor " << scale << std::endl;
+            std::cout << "  Input Peak: " << peak_in << " V, " << 20 * std::log10(peak_in) << " dBFS, RMS: " << 20 * std::log10(rms_in) << " dBFS" << std::endl;
+            std::cout << "  Output Peak: " << peak_out << " V, " << 20 * std::log10(peak_out) << " dBFS, RMS: " << 20 * std::log10(rms_out) << " dBFS" << std::endl;
+            std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
+            
+            std::cout << std::endl;
+            
+            if (!output_file.empty()) {
+                writeWav(signalOut, output_file, sample_rate);
+            }
+            return true;
+        } else {
+            std::cerr << "Analysis Type not valid: " << analysis_type << std::endl;
+            return false;
         }
-        
-        solver->closeProbeFile();
-        
-        rms_in = std::sqrt(rms_in / signalIn.size());
-        rms_out = std::sqrt(rms_out / signalIn.size());
-
-        float outputPeak = 0.0f;
-        for (float v : signalOut) {
-            outputPeak = std::max(outputPeak, std::abs(v));
-        }
-
-        solver->printDCOperatingPoint();
-
-        // Print statistics
-        std::cout << "Audio Statistics:" << std::endl;
-        std::cout << "  Mean Input Signal " << mean << std::endl;
-        std::cout << "  Max Normalized " << maxNormalized << " V, Scale Factor " << scale << std::endl;
-        std::cout << "  Input Peak: " << peak_in << " V, " << 20 * std::log10(peak_in) << " dBFS, RMS: " << 20 * std::log10(rms_in) << " dBFS" << std::endl;
-        std::cout << "  Output Peak: " << peak_out << " V, " << 20 * std::log10(peak_out) << " dBFS, RMS: " << 20 * std::log10(rms_out) << " dBFS" << std::endl;
-        std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
-        
-        std::cout << std::endl;
-
-        if (!output_file.empty())
-            writeWav(signalOut, output_file, sample_rate);
-        return true;
     }
 
     bool writeWav(std::vector<float> signalOut,
@@ -259,48 +271,55 @@ public:
 int main(int argc, char *argv[]) {
     CLI::App app{"Pedal Circuit Simulator"};
     
+    std::string analysis_type = "TRAN";
     std::string input_file;
-    float input_frequency = 440.0f;
-    float input_duration = 1.0f;
-    float max_input_voltage;
-    int input_impedance;
+    float input_frequency = 440;
+    int input_duration = 2;
+    float max_input_voltage = 0.15;
+    int input_impedance = 25000;
     int sample_rate = 44100;
     std::string output_file;
     std::string netlist_file;
     bool bypass = false;
-    int max_iterations;
-    double tolerance;
+    int max_iterations = 20;
+    double tolerance = 1e-6;
     
-    app.add_option("-i,--input", input_file, "Input file")->check(CLI::ExistingFile);
-    app.add_option("-f,--frequency", input_frequency, "Input frequency")->default_val(input_frequency);
-    app.add_option("-d,--duration", input_duration, "Input duration")->default_val(input_duration);
-    app.add_option("-s,--sample-rate", sample_rate, "Sample rate")->default_val(sample_rate);
-    app.add_option("-o,--output", output_file, "Output file");
-    app.add_option("-c,--circuit", netlist_file, "Netlist file")->check(CLI::ExistingFile);
-    app.add_option("-v,--max-input-voltage", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(0.15);
-    app.add_option("-I,--input-impedance", input_impedance, "Input Impedance")->check(CLI::Range(0, 30000))->default_val(25000);
-    app.add_flag("-b,--bypass", bypass, "Bypass Circuit")->default_val(false);
-    app.add_option("-m,--max-iterations", max_iterations, "Max solver's iterations")->default_val(50);
-    app.add_option("-t,--tolerance", tolerance, "Solver's tolerance")->default_val(1e-8);
+    app.add_option("-a,--analysis-type", analysis_type, "Tipo di analisi")->check(CLI::IsMember({"TRAN", "DC"}))->default_val(analysis_type);
+    
+    app.add_option("-i,--input-file", input_file, "Input file")->check(CLI::ExistingFile);
+    app.add_option("-f,--input-frequency", input_frequency, "Input frequency")->default_val(input_frequency);
+    app.add_option("-d,--input-duration", input_duration, "Input duration")->default_val(input_duration);
+    app.add_option("-v,--input-voltage-amplitude", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(max_input_voltage);
+    app.add_option("-I,--input-impedance", input_impedance, "Input Impedance")->check(CLI::Range(0, 30000))->default_val(input_impedance);
+    app.add_option("-s,--sample-rate", sample_rate, "Sample rate");
+    
+    app.add_option("-o,--output-file", output_file, "Output file");
+    
+    app.add_option("-c,--circuit", netlist_file, "Netlist file")->check(CLI::ExistingFile)->required();
+    app.add_flag("-b,--bypass", bypass, "Bypass Circuit")->default_val(bypass);
+    
+    app.add_option("-m,--max-iterations", max_iterations, "Max solver's iterations")->default_val(max_iterations);
+    app.add_option("-t,--tolerance", tolerance, "Solver's tolerance")->default_val(tolerance);
     
     CLI11_PARSE(app, argc, argv);
 
     std::cout << "Input Parameters" << std::endl;
+    std::cout << "   Analysis Type: " << analysis_type << std::endl;
     std::cout << "   Input File: " << input_file << std::endl;
-    std::cout << "   Input Frequency: " << input_frequency << std::endl;
-    std::cout << "   Input Duration: " << input_duration << std::endl;
-    std::cout << "   Sample Sate: " << sample_rate << std::endl;
-    std::cout << "   Output File: " << output_file << std::endl;
-    std::cout << "   Netlist File: " << netlist_file << std::endl;
-    std::cout << "   Max Input Voltage: " << max_input_voltage << " V" << std::endl;
+    std::cout << "   Input Frequency: " << input_frequency << " Hz" << std::endl;
+    std::cout << "   Input Duration: " << input_duration << " s" << std::endl;
+    std::cout << "   Input Voltage Amplitude: " << max_input_voltage << " V" << std::endl;
     std::cout << "   Input Impedance: " << input_impedance << " Ω" << std::endl;
+    std::cout << "   Sample Rate: " << sample_rate << " Hz" << std::endl;
+    std::cout << "   Output File: " << output_file << std::endl;
+    std::cout << "   Circuit File: " << netlist_file << std::endl;
     std::cout << "   Bypass Circuit: " << (bypass ? "True" : "False") << std::endl;
     std::cout << "   Max Iterations: " << max_iterations << std::endl;
     std::cout << "   Tolerance: " << tolerance << std::endl;
     std::cout << std::endl;
 
     try {
-        WavFileProcessor processor(netlist_file, sample_rate, input_frequency, input_duration, max_input_voltage, input_impedance, bypass, max_iterations, tolerance);
+        WavFileProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, max_input_voltage, input_impedance, bypass, max_iterations, tolerance);
         if (!processor.process(input_file, output_file)) {
             return 1;
         }

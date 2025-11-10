@@ -50,7 +50,15 @@ public:
                const Eigen::VectorXd& V, double dt) override {
         
         if (dt <= 0) {
-            throw std::runtime_error("Inductor: Time step dt must be positive");
+            // Caso DC: induttore cortocircuitato trattato come resistenza con valore molto piccolo
+            double g = 1e6; // Conduttanza molto alta (R ≈ 0)
+            if (n1 >= 0) G(n1, n1) += g;
+            if (n2 >= 0) G(n2, n2) += g;
+            if (n1 >= 0 && n2 >= 0) {
+                G(n1, n2) -= g;
+                G(n2, n1) -= g;
+            }
+            return;
         }
         
         // Leggi tensioni nodali

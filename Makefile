@@ -16,16 +16,13 @@ BIN_INSTALL_DIR = $(HOME)/bin
 LV2_CXXFLAGS = -fPIC -shared
 LV2_INCLUDES = $(shell pkg-config --cflags lv2 2>/dev/null || echo "")
 
-all: wav_processor wav_streaming_processor dc_analisys lv2
+all: wav_processor wav_streaming_processor
 
 wav_processor: clean_wav_processor create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/wav_processor.cpp -o bin/wav_processor $(LIBS_SNDFILE) ${DEBUG}
 
 wav_streaming_processor: clean_wav_streaming_processor create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/wav_streaming_processor.cpp -o bin/wav_streaming_processor $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${DEBUG}
-
-dc_analisys: clean_dc_analisys
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/dc_analisys.cpp -o bin/dc_analisys ${DEBUG}
 
 lv2: clean_lv2
 	$(CXX) $(CXXFLAGS) $(LV2_CXXFLAGS) $(INCLUDES) $(LV2_INCLUDES) src/lv2_plugin.cpp -o lib/$(PLUGIN_SO) ${DEBUG}
@@ -36,9 +33,7 @@ install-lv2: lv2
 	@cp lib/$(PLUGIN_SO) $(INSTALL_DIR)/
 	@cp ttl/manifest.ttl $(INSTALL_DIR)/
 	@cp ttl/circuit_simulator.ttl $(INSTALL_DIR)/
-	@if [ -f circuits/bazz_fuss.cir ]; then \
-		cp circuits/bazz_fuss.cir $(INSTALL_DIR)/circuits/; \
-	fi
+	@cp circuits/*.cir $(INSTALL_DIR)/circuits/
 	@echo "Test with: jalv.gtk http://github.com/buzzobuono/circuit_simulator"
 
 uninstall-lv2:
@@ -69,11 +64,8 @@ install: all
 	@mkdir -p $(BIN_INSTALL_DIR)
 	@cp bin/wav_processor $(BIN_INSTALL_DIR)/
 	@cp bin/wav_streaming_processor $(BIN_INSTALL_DIR)/
-	@cp bin/dc_analisys $(BIN_INSTALL_DIR)/
 	@chmod +x $(BIN_INSTALL_DIR)/wav_processor
-	@chmod +x $(BIN_INSTALL_DIR)/sine_input_processor
 	@chmod +x $(BIN_INSTALL_DIR)/wav_streaming_processor
-	@chmod +x $(BIN_INSTALL_DIR)/dc_analisys
 	@echo "✓ Binaries installed to ~/bin"
 	@echo "✓ Make sure ~/bin is in your PATH"
 
@@ -81,18 +73,13 @@ install: all
 uninstall:
 	@rm -f $(BIN_INSTALL_DIR)/wav_processor
 	@rm -f $(BIN_INSTALL_DIR)/wav_streaming_processor
-	@rm -f $(BIN_INSTALL_DIR)/dc_analisys
 	@echo "✓ Binaries removed from ~/bin"
-
 
 clean_wav_processor:
 	@rm -f bin/wav_processor
 
 clean_wav_streaming_processor:
 	@rm -f bin/wav_streaming_processor
-
-clean_dc_analisys:
-	@rm -f bin/dc_analisys
 
 clean_lv2:
 	@rm -f lib/$(PLUGIN_SO)

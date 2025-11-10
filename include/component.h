@@ -6,8 +6,12 @@
 #include <Eigen/Dense>
 
 enum class ComponentType {
-    RESISTOR, CAPACITOR, INDUCTOR,
-    DIODE, BJT, VOLTAGE_SOURCE,
+    RESISTOR, 
+    CAPACITOR, 
+    INDUCTOR,
+    DIODE, 
+    BJT, 
+    VOLTAGE_SOURCE,
     POTENTIOMETER,
     WIRE
 };

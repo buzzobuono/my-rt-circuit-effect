@@ -86,35 +86,9 @@ public:
             Gdc.setZero();
             Idc.setZero();
             
-            // Stamp dei componenti con dt=infinito (DC)
-            // Per l'analisi DC:
-            // - Condensatori = circuito aperto (non contribuiscono)
-            // - Induttori = cortocircuito (contribuiscono come resistenze con R=0)
             for (auto& comp : circuit.components) {
-                if (comp->type == ComponentType::CAPACITOR) {
-                    // I condensatori non contribuiscono in DC
-                    continue;
-                } else if (comp->type == ComponentType::INDUCTOR) {
-                    // Gli induttori sono cortocircuiti in DC
-                    // Trattali come resistenze con valore molto piccolo
-                    auto* ind = dynamic_cast<Inductor*>(comp.get());
-                    if (ind) {
-                        int n1 = ind->nodes[0];
-                        int n2 = ind->nodes[1];
-                        double g = 1e6; // Conduttanza molto alta (R ≈ 0)
-                        
-                        if (n1 >= 0) Gdc(n1, n1) += g;
-                        if (n2 >= 0) Gdc(n2, n2) += g;
-                        if (n1 >= 0 && n2 >= 0) {
-                            Gdc(n1, n2) -= g;
-                            Gdc(n2, n1) -= g;
-                        }
-                    }
-                } else {
-                    // Altri componenti (resistori, diodi, ecc.) stampano normalmente
-                    // Passa dt=0 per indicare analisi DC
-                    comp->stamp(Gdc, Idc, Vdc, 0.0);
-                }
+                // Passo dt=0 per indicare analisi DC
+                comp->stamp(Gdc, Idc, Vdc, 0.0);
             }
 
             // Nodo di massa forzato

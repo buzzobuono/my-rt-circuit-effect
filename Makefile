@@ -1,6 +1,11 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -O3 #-Wall -Wextra -fsanitize=address
-INCLUDES = -I/usr/include/eigen3 -Iinclude
+ifeq ($(origin TERMUX__PREFIX), environment)
+    INCLUDES = -I$(TERMUX__PREFIX)/include/eigen3 -Iinclude
+    CXXFLAGS = --rtlib=compiler-rt -std=c++17 -O3
+else
+    CXXFLAGS = -std=c++17 -O3 #-Wall -Wextra -fsanitize=address
+    INCLUDES = -I/usr/include/eigen3 -Iinclude
+endif
 LIBS_SNDFILE = -lsndfile
 LIBS_PORTAUDIO = -lportaudio
 
@@ -16,10 +21,10 @@ BIN_INSTALL_DIR = $(HOME)/bin
 LV2_CXXFLAGS = -fPIC -shared
 LV2_INCLUDES = $(shell pkg-config --cflags lv2 2>/dev/null || echo "")
 
-all: pedal_spice wav_streaming_processor
+all: spicepedal wav_streaming_processor
 
-pedal_spice: clean_pedal_spice create_bin_folder
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/pedal_spice.cpp -o bin/pedal_spice $(LIBS_SNDFILE) ${DEBUG}
+spicepedal: clean_spicepedal create_bin_folder
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/spicepedal.cpp -o bin/spicepedal $(LIBS_SNDFILE) ${DEBUG}
 
 wav_streaming_processor: clean_wav_streaming_processor create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/wav_streaming_processor.cpp -o bin/wav_streaming_processor $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${DEBUG}
@@ -62,20 +67,20 @@ test-lv2: install-lv2
 
 install: all
 	@mkdir -p $(BIN_INSTALL_DIR)
-	@cp bin/pedal_spice $(BIN_INSTALL_DIR)/
+	@cp bin/spicepedal $(BIN_INSTALL_DIR)/
 	@cp bin/wav_streaming_processor $(BIN_INSTALL_DIR)/
-	@chmod +x $(BIN_INSTALL_DIR)/pedal_spice
+	@chmod +x $(BIN_INSTALL_DIR)/spicepedal
 	@chmod +x $(BIN_INSTALL_DIR)/wav_streaming_processor
 	@echo "✓ Binaries installed to ~/bin"
 	@echo "✓ Make sure ~/bin is in your PATH"
 
 # Uninstall binaries from ~/bin
 uninstall:
-	@rm -f $(BIN_INSTALL_DIR)/pedal_spice
+	@rm -f $(BIN_INSTALL_DIR)/spicepedal
 	@rm -f $(BIN_INSTALL_DIR)/wav_streaming_processor
 	@echo "✓ Binaries removed from ~/bin"
 
-clean_pedal_spice:
+clean_spicepedal:
 	@rm -f bin/pedal_spice
 
 clean_wav_streaming_processor:

@@ -10,7 +10,7 @@
 #include "circuit.h"
 #include "circuit_solver.h"
 
-class PedalSpiceProcessor
+class SpicePedalProcessor
 {
 private:
     Circuit circuit;
@@ -26,7 +26,7 @@ private:
     double tolerance;
 
 public:
-    PedalSpiceProcessor(std::string analysis_type,
+    SpicePedalProcessor(std::string analysis_type,
                      const std::string &netlist_file,
                      double sample_rate,
                      int input_frequency,
@@ -97,7 +97,7 @@ public:
                 signalIn.resize(total_samples, 0.0f);
                 for (size_t i = 0; i < total_samples; ++i) {
                     double t = i / sample_rate;
-                    signalIn[i] = max_input_voltage * std::sin(2.0 * M_PI * input_frequency * t);
+                    signalIn[i] = std::sin(2.0 * M_PI * input_frequency * t);
                 }
             }
             
@@ -121,13 +121,17 @@ public:
             
             for (float& s : signalIn) s *= scale;
             
-            solver->initialize();
+            if (!bypass) {
+                solver->initialize();
+            }
             
             std::vector<float> signalOut(signalIn.size());
             
             float peak_in = 0.0f, peak_out = 0.0f;
             float rms_in = 0.0f, rms_out = 0.0f;
             
+            auto start = std::chrono::high_resolution_clock::now();
+    
             for (size_t i = 0; i < signalIn.size(); i++) {
                 if (!bypass) {
                     signalOut[i] = 0;
@@ -144,6 +148,8 @@ public:
                 rms_in += signalIn[i] * signalIn[i];
                 rms_out += signalOut[i] * signalOut[i];
             }
+            
+            auto end = std::chrono::high_resolution_clock::now();
             
             rms_in = std::sqrt(rms_in / signalIn.size());
             rms_out = std::sqrt(rms_out / signalIn.size());
@@ -162,7 +168,10 @@ public:
             std::cout << "  Input Peak: " << peak_in << " V, " << 20 * std::log10(peak_in) << " dBFS, RMS: " << 20 * std::log10(rms_in) << " dBFS" << std::endl;
             std::cout << "  Output Peak: " << peak_out << " V, " << 20 * std::log10(peak_out) << " dBFS, RMS: " << 20 * std::log10(rms_out) << " dBFS" << std::endl;
             std::cout << "  Circuit gain: " << 20 * std::log10(rms_out / rms_in) << " dB" << std::endl;
+            std::cout << std::endl;
             
+            std::cout << "Process Statistics:" << std::endl;
+            std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
             std::cout << std::endl;
             
             if (!output_file.empty()) {
@@ -263,7 +272,7 @@ public:
 };
 
 int main(int argc, char *argv[]) {
-    CLI::App app{"Pedal Spice Simulator"};
+    CLI::App app{"SpicePedal: a realtime simple spice-like simulator for audio"};
     
     std::string analysis_type = "TRAN";
     std::string input_file;
@@ -313,7 +322,7 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl;
 
     try {
-        PedalSpiceProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, max_input_voltage, input_impedance, bypass, max_iterations, tolerance);
+        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, max_input_voltage, input_impedance, bypass, max_iterations, tolerance);
         if (!processor.process(input_file, output_file)) {
             return 1;
         }

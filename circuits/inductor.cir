@@ -6,4 +6,4 @@ Rload 2 0 1k
 
 .input 1
 .output 2
-.probe V(1) V(2) I(L1)
+.probe probe-inductor.csv V(1) V(2) I(L1)

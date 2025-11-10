@@ -14,7 +14,7 @@ Pvol0 4 0 7 100k 0.95 LOG
 
 .input 5
 .output 7
-*.probe probe-file.csv V(2)
+.probe probe-file.csv V(2)
 .ic C1 0.60683
 .ic C2 0.50573
 .warmup 2

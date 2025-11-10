@@ -16,10 +16,10 @@ BIN_INSTALL_DIR = $(HOME)/bin
 LV2_CXXFLAGS = -fPIC -shared
 LV2_INCLUDES = $(shell pkg-config --cflags lv2 2>/dev/null || echo "")
 
-all: wav_processor wav_streaming_processor
+all: pedal_spice wav_streaming_processor
 
-wav_processor: clean_wav_processor create_bin_folder
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/wav_processor.cpp -o bin/wav_processor $(LIBS_SNDFILE) ${DEBUG}
+pedal_spice: clean_pedal_spice create_bin_folder
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/pedal_spice.cpp -o bin/pedal_spice $(LIBS_SNDFILE) ${DEBUG}
 
 wav_streaming_processor: clean_wav_streaming_processor create_bin_folder
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/wav_streaming_processor.cpp -o bin/wav_streaming_processor $(LIBS_SNDFILE) $(LIBS_PORTAUDIO) ${DEBUG}
@@ -62,21 +62,21 @@ test-lv2: install-lv2
 
 install: all
 	@mkdir -p $(BIN_INSTALL_DIR)
-	@cp bin/wav_processor $(BIN_INSTALL_DIR)/
+	@cp bin/pedal_spice $(BIN_INSTALL_DIR)/
 	@cp bin/wav_streaming_processor $(BIN_INSTALL_DIR)/
-	@chmod +x $(BIN_INSTALL_DIR)/wav_processor
+	@chmod +x $(BIN_INSTALL_DIR)/pedal_spice
 	@chmod +x $(BIN_INSTALL_DIR)/wav_streaming_processor
 	@echo "✓ Binaries installed to ~/bin"
 	@echo "✓ Make sure ~/bin is in your PATH"
 
 # Uninstall binaries from ~/bin
 uninstall:
-	@rm -f $(BIN_INSTALL_DIR)/wav_processor
+	@rm -f $(BIN_INSTALL_DIR)/pedal_spice
 	@rm -f $(BIN_INSTALL_DIR)/wav_streaming_processor
 	@echo "✓ Binaries removed from ~/bin"
 
-clean_wav_processor:
-	@rm -f bin/wav_processor
+clean_pedal_spice:
+	@rm -f bin/pedal_spice
 
 clean_wav_streaming_processor:
 	@rm -f bin/wav_streaming_processor

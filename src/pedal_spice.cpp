@@ -10,7 +10,7 @@
 #include "circuit.h"
 #include "circuit_solver.h"
 
-class WavFileProcessor
+class PedalSpiceProcessor
 {
 private:
     Circuit circuit;
@@ -26,7 +26,7 @@ private:
     double tolerance;
 
 public:
-    WavFileProcessor(std::string analysis_type,
+    PedalSpiceProcessor(std::string analysis_type,
                      const std::string &netlist_file,
                      double sample_rate,
                      int input_frequency,
@@ -128,8 +128,6 @@ public:
             float peak_in = 0.0f, peak_out = 0.0f;
             float rms_in = 0.0f, rms_out = 0.0f;
             
-            solver->openProbeFile("probe.csv");
-            
             for (size_t i = 0; i < signalIn.size(); i++) {
                 if (!bypass) {
                     signalOut[i] = 0;
@@ -139,17 +137,13 @@ public:
                 } else {
                     signalOut[i] = signalIn[i];
                 }
-                
-                solver->logProbes(i * 1.0 / sample_rate);
-                
+                 
                 // Update statistics
                 peak_in = std::max(peak_in, std::abs(signalIn[i]));
                 peak_out = std::max(peak_out, std::abs(signalOut[i]));
                 rms_in += signalIn[i] * signalIn[i];
                 rms_out += signalOut[i] * signalOut[i];
             }
-            
-            solver->closeProbeFile();
             
             rms_in = std::sqrt(rms_in / signalIn.size());
             rms_out = std::sqrt(rms_out / signalIn.size());
@@ -222,7 +216,7 @@ public:
         
         std::cout << "Output File Format" << std::endl;
         std::cout << "   File Name: " << output_file << std::endl;
-        std::cout << "   Duration: " << (float)signalOut.size() / sample_rate << " sec" << std::endl;
+        std::cout << "   Duration: " << (float)signalOut.size() / sample_rate << "s" << std::endl;
         
         printFileFormat(output_file);
         
@@ -234,32 +228,32 @@ public:
         sfInfo.format = 0;
         SNDFILE* sound_file = sf_open(file.c_str(), SFM_READ, &sfInfo);
         sf_close(sound_file);
-        std::cout << "   Canali: " << sfInfo.channels << std::endl;
-        std::cout << "   Sample Rate: " << sfInfo.samplerate << " Hz" << std::endl;
+        std::cout << "   Channels: " << sfInfo.channels << std::endl;
+        std::cout << "   Sample Rate: " << sfInfo.samplerate << "Hz" << std::endl;
         std::cout << "   Frames: " << sfInfo.frames << std::endl;
-        std::cout << "   Formato numerico (bitmask): 0x" << std::hex << sfInfo.format << std::dec << std::endl;
+        std::cout << "   Numeric Format (bitmask): 0x" << std::hex << sfInfo.format << std::dec << std::endl;
 
         // Decodifica del formato audio (opzionale)
         int major_format = sfInfo.format & SF_FORMAT_TYPEMASK;
         int subtype = sfInfo.format & SF_FORMAT_SUBMASK;
 
-        std::cout << "   Formato container: ";
+        std::cout << "   Container Format: ";
         switch (major_format) {
             case SF_FORMAT_WAV:      std::cout << "WAV"; break;
             case SF_FORMAT_AIFF:     std::cout << "AIFF"; break;
             case SF_FORMAT_FLAC:     std::cout << "FLAC"; break;
-            default:                 std::cout << "Altro (" << std::hex << major_format << std::dec << ")"; break;
+            default:                 std::cout << "Other (" << std::hex << major_format << std::dec << ")"; break;
         }
         std::cout << std::endl;
 
-        std::cout << "   Sottotipo (codifica PCM, float, etc.): ";
+        std::cout << "   Subtype (PCM, float, etc.): ";
         switch (subtype) {
             case SF_FORMAT_PCM_16:   std::cout << "PCM 16-bit"; break;
             case SF_FORMAT_PCM_24:   std::cout << "PCM 24-bit"; break;
             case SF_FORMAT_PCM_32:   std::cout << "PCM 32-bit"; break;
             case SF_FORMAT_FLOAT:    std::cout << "Float"; break;
             case SF_FORMAT_DOUBLE:   std::cout << "Double"; break;
-            default:                 std::cout << "Altro (" << std::hex << subtype << std::dec << ")"; break;
+            default:                 std::cout << "Other (" << std::hex << subtype << std::dec << ")"; break;
         }
         std::cout << std::endl;
 
@@ -269,7 +263,7 @@ public:
 };
 
 int main(int argc, char *argv[]) {
-    CLI::App app{"Pedal Circuit Simulator"};
+    CLI::App app{"Pedal Spice Simulator"};
     
     std::string analysis_type = "TRAN";
     std::string input_file;
@@ -284,33 +278,33 @@ int main(int argc, char *argv[]) {
     int max_iterations = 20;
     double tolerance = 1e-6;
     
-    app.add_option("-a,--analysis-type", analysis_type, "Tipo di analisi")->check(CLI::IsMember({"TRAN", "DC"}))->default_val(analysis_type);
+    app.add_option("-a,--analysis-type", analysis_type, "Analysis Type")->check(CLI::IsMember({"TRAN", "DC"}))->default_val(analysis_type);
     
-    app.add_option("-i,--input-file", input_file, "Input file")->check(CLI::ExistingFile);
-    app.add_option("-f,--input-frequency", input_frequency, "Input frequency")->default_val(input_frequency);
-    app.add_option("-d,--input-duration", input_duration, "Input duration")->default_val(input_duration);
+    app.add_option("-i,--input-file", input_file, "Input File")->check(CLI::ExistingFile);
+    app.add_option("-f,--input-frequency", input_frequency, "Input Frequency")->default_val(input_frequency);
+    app.add_option("-d,--input-duration", input_duration, "Input Duration")->default_val(input_duration);
     app.add_option("-v,--input-voltage-amplitude", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(max_input_voltage);
     app.add_option("-I,--input-impedance", input_impedance, "Input Impedance")->check(CLI::Range(0, 30000))->default_val(input_impedance);
-    app.add_option("-s,--sample-rate", sample_rate, "Sample rate");
+    app.add_option("-s,--sample-rate", sample_rate, "Sample Rate");
     
-    app.add_option("-o,--output-file", output_file, "Output file");
+    app.add_option("-o,--output-file", output_file, "Output File");
     
-    app.add_option("-c,--circuit", netlist_file, "Netlist file")->check(CLI::ExistingFile)->required();
+    app.add_option("-c,--circuit", netlist_file, "Netlist File")->check(CLI::ExistingFile)->required();
     app.add_flag("-b,--bypass", bypass, "Bypass Circuit")->default_val(bypass);
     
-    app.add_option("-m,--max-iterations", max_iterations, "Max solver's iterations")->default_val(max_iterations);
-    app.add_option("-t,--tolerance", tolerance, "Solver's tolerance")->default_val(tolerance);
+    app.add_option("-m,--max-iterations", max_iterations, "Max Solver's Iterations")->default_val(max_iterations);
+    app.add_option("-t,--tolerance", tolerance, "Solver's Tolerance")->default_val(tolerance);
     
     CLI11_PARSE(app, argc, argv);
 
     std::cout << "Input Parameters" << std::endl;
     std::cout << "   Analysis Type: " << analysis_type << std::endl;
     std::cout << "   Input File: " << input_file << std::endl;
-    std::cout << "   Input Frequency: " << input_frequency << " Hz" << std::endl;
-    std::cout << "   Input Duration: " << input_duration << " s" << std::endl;
-    std::cout << "   Input Voltage Amplitude: " << max_input_voltage << " V" << std::endl;
-    std::cout << "   Input Impedance: " << input_impedance << " Ω" << std::endl;
-    std::cout << "   Sample Rate: " << sample_rate << " Hz" << std::endl;
+    std::cout << "   Input Frequency: " << input_frequency << "Hz" << std::endl;
+    std::cout << "   Input Duration: " << input_duration << "s" << std::endl;
+    std::cout << "   Input Voltage Amplitude: " << max_input_voltage << "V" << std::endl;
+    std::cout << "   Input Impedance: " << input_impedance << "Ω" << std::endl;
+    std::cout << "   Sample Rate: " << sample_rate << "Hz" << std::endl;
     std::cout << "   Output File: " << output_file << std::endl;
     std::cout << "   Circuit File: " << netlist_file << std::endl;
     std::cout << "   Bypass Circuit: " << (bypass ? "True" : "False") << std::endl;
@@ -319,7 +313,7 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl;
 
     try {
-        WavFileProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, max_input_voltage, input_impedance, bypass, max_iterations, tolerance);
+        PedalSpiceProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, max_input_voltage, input_impedance, bypass, max_iterations, tolerance);
         if (!processor.process(input_file, output_file)) {
             return 1;
         }

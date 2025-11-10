@@ -55,6 +55,12 @@ public:
         V.setZero();
     }
     
+    ~CircuitSolver() {
+        if (circuit.hasProbes()) {
+            closeProbeFile();
+        }
+    }
+
     bool initialize() {
         if (circuit.hasInitialConditions()) {
             circuit.applyInitialConditions();
@@ -66,9 +72,10 @@ public:
             std::cout << "Starting from zero state" << std::endl;
             std::cout << std::endl;
         }
-
+        if (circuit.hasProbes()) {
+            openProbeFile();
+        }
         printDCOperatingPoint();
-        
         return true;
     }
     
@@ -116,6 +123,7 @@ public:
                 
                 // Copia le tensioni DC come condizioni iniziali
                 V = Vdc;
+
                 return true;
             }
         }
@@ -125,7 +133,8 @@ public:
         return false;
     }
 
-    void openProbeFile(const std::string& filename = "probe.csv") {
+    void openProbeFile() {
+        std::string filename = circuit.getProbeFile();
         logFile.open(filename);
         if (!logFile.is_open()) {
             throw std::runtime_error("Cannot open probe file: " + filename);
@@ -223,6 +232,8 @@ public:
                 for (auto& comp : circuit.components) {
                     comp->updateHistory(V, dt);
                 }
+
+                logProbes(sample_count * dt);
                 sample_count++;
                 return true;
             }
@@ -231,20 +242,15 @@ public:
         }
         
         if (sample_count < max_non_convergence_warning) {
-            std::cerr << "WARNING: Sample " << sample_count << " did not converge after " << max_iterations  << " iterations" << std::endl;
-            std::cerr << "  Final error: " << final_error << std::endl;
-            std::cerr << "  Node voltages: ";
-            for (int i = 0; i < V.size(); i++) {
-                std::cerr << "V[" << i << "]=" << V(i) << " ";
-            }
-            std::cerr << std::endl << std::endl;
+            std::cerr << "WARNING: Sample " << sample_count << " did not converge after " << max_iterations  << " iterations with final error: " << final_error << std::endl;
+            printDCOperatingPoint();
         }
         
+        logProbes(sample_count * dt);
         sample_count++;
         return false;
     }
     
-    // Get output voltage
     double getOutputVoltage() const {
         return V(circuit.output_node);
     }

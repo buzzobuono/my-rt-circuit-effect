@@ -14,7 +14,9 @@
 #include <sndfile.h>
 #include <portaudio.h>
 #include "external/CLI11.hpp"
-#include "signal_processor.h"
+
+#include "circuit.h"
+#include "circuit_solver.h"
 
 // =============================================================
 // Funzioni per input non bloccante su Linux

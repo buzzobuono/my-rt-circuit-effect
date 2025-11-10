@@ -30,7 +30,7 @@
 struct ProbeTarget {
     enum class Type { VOLTAGE, CURRENT };
     Type type;
-    std::string name;  // nodo (es. "1") o componente (es. "L1")
+    std::string name;
 };
 
 class Circuit {
@@ -45,7 +45,8 @@ public:
     std::vector<std::pair<int, std::string>> pending_params;
     std::map<int, Potentiometer*> param_map;
     std::vector<ProbeTarget> probes;
-    
+    std::string probe_file;
+
     Circuit() : num_nodes(0), output_node(-1) {}
     
     bool loadNetlist(const std::string& filename) {
@@ -115,7 +116,6 @@ public:
                     double Mj;
                     std::string token;
                     while (iss >> token) {
-                        std::cout << token << std::endl;
                         if (token.find("Is=") == 0) Is = std::stod(token.substr(3));
                         else if (token.find("N=") == 0) n = std::stod(token.substr(2));
                         else if (token.find("Vt=") == 0) Vt = std::stod(token.substr(3));
@@ -135,7 +135,6 @@ public:
                     double Is, Bf, Br, Vt;
                     std::string token;
                     while (iss >> token) {
-                        std::cout << token << std::endl;
                         if (token.find("Is=") == 0) {
                             Is = std::stod(token.substr(3));
                         } else if (token.find("Bf=") == 0) {
@@ -211,22 +210,25 @@ public:
                         std::cout << "   Directive Output Node: " << output_node << std::endl;
                     } else if (directive == ".probe") {
                         std::string token;
+                        std::cout << "   Directive Probe:" << std::endl;
+                        iss >> probe_file;
+                        std::cout << "      File Name: " << probe_file << std::endl;
                         while (iss >> token) {
                             if (token[0] == 'V' && token[1] == '(') {
                                 std::string node_str = token.substr(2, token.size() - 3);
                                 probes.push_back({ProbeTarget::Type::VOLTAGE, node_str});
-                                std::cout << "   Probe voltage node: " << node_str << std::endl;
+                                std::cout << "      Voltage Node: " << node_str << std::endl;
                             } else if (token[0] == 'I' && token[1] == '(') {
                                 std::string comp_str = token.substr(2, token.size() - 3);
                                 probes.push_back({ProbeTarget::Type::CURRENT, comp_str});
-                                std::cout << "   Probe current of: " << comp_str << std::endl;
+                                std::cout << "      Current of Component: " << comp_str << std::endl;
                             } else {
-                                std::cerr << "   Warning: Unknown probe token " << token << std::endl;
+                                std::cerr << "      Warning: Unknown probe token " << token << std::endl;
                             }
                         }
                     } else if (directive == ".warmup") {
                         iss >> warmup_duration;
-                        std::cout << "   Directive WarmUp Duration: " << warmup_duration << "sec" << std::endl;
+                        std::cout << "   Directive WarmUp Duration: " << warmup_duration << "s" << std::endl;
                     } else if (directive == ".ic") {
                         std::string cap_name;
                         double v0;
@@ -282,6 +284,14 @@ public:
         return warmup_duration > 0;
     }
 
+    bool hasProbes() const {
+        return !probes.empty();
+    }
+
+    std::string getProbeFile() {
+        return probe_file;
+    }
+    
     void applyInitialConditions() {
         std::cout << "Initial Conditions apply" << std::endl;
         if (initial_conditions.empty()) {

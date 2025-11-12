@@ -55,7 +55,7 @@ int getch() {
 // =============================================================
 // Classe streaming con controllo live
 // =============================================================
-class WavStreamingProcessor {
+class SpicePedalStreamingProcessor {
 private:
     Circuit circuit;
     std::unique_ptr<CircuitSolver> solver;
@@ -67,7 +67,7 @@ private:
     int currentParamIndex = 0;
 
 public:
-    WavStreamingProcessor(const std::string& netlist_file,
+    SpicePedalStreamingProcessor(const std::string& netlist_file,
                           double sample_rate,
                           double input_gain,
                           int input_impedance,
@@ -337,7 +337,7 @@ int main(int argc, char* argv[]) {
         double sample_rate = sf_info.samplerate;
         sf_close(tmp);
 
-        WavStreamingProcessor processor(netlist_file, sample_rate, input_gain, input_impedance, max_iterations, tolerance, buffer_size);
+        SpicePedalStreamingProcessor processor(netlist_file, sample_rate, input_gain, input_impedance, max_iterations, tolerance, buffer_size);
         if (!processor.processAndPlay(input_file))
             return 1;
 

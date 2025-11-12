@@ -15,27 +15,28 @@ class CircuitSolver {
 private:
     Circuit& circuit;
     Eigen::MatrixXd G;
-    Eigen::VectorXd I, V;
+    Eigen::VectorXd I, V, V_new;
+    
+    Eigen::PartialPivLU<Eigen::MatrixXd> lu_solver;
+    
     double dt;
     int max_iterations;
-    double tolerance;
-    int input_impedance;
+    double tolerance_sq;
+    double input_g;
     int max_non_convergence_warning;
     std::ofstream logFile;
     bool logging_enabled = false;
     
-    bool warmUp(double warmup_duration) {
+    void warmUp(double warmup_duration) {
         std::cout << "Circuit WarmUp" << std::endl;
         int warmup_samples = static_cast<int>(warmup_duration / dt);
         for (int i = 0; i < warmup_samples; i++) {
             if (!solve(0.0)) {
                 std::cerr << "   WarmUp sample " << i << " convergence issue" << std::endl;
-                return 1;
             }
         }
         std::cout << "   Circuit stabilized after " << (warmup_samples * dt * 1000) << " ms" << std::endl;
         std::cout << std::endl;
-        return 0;
     }
 
     
@@ -44,14 +45,15 @@ public:
     CircuitSolver(Circuit& ckt, double sample_rate, int input_impedance, int max_iterations, double tolerance, int max_non_convergence_warning = 50) 
         : circuit(ckt), 
           dt(1.0 / sample_rate),
-          input_impedance(input_impedance),
+          input_g(1.0 / input_impedance),
           max_iterations(max_iterations),
-          tolerance(tolerance),
+          tolerance_sq(tolerance*tolerance),
           max_non_convergence_warning(max_non_convergence_warning) {
         
         G.resize(circuit.num_nodes, circuit.num_nodes);
         I.resize(circuit.num_nodes);
         V.resize(circuit.num_nodes);
+              V_new.resize(circuit.num_nodes);
         V.setZero();
     }
     
@@ -107,11 +109,10 @@ public:
             // Soluzione del sistema
             VectorXd Vdc_new = Gdc.lu().solve(Idc);
             
-            // Check convergenza (importante per componenti non lineari)
-            double error = (Vdc_new - Vdc).norm();
+            double error_sq = (V_new - V).squaredNorm();
             Vdc = Vdc_new;
             
-            if (error < tolerance) {
+            if (error_sq < tolerance_sq) {
                 // Convergenza raggiunta
                 std::cout << "   Convergenza raggiunta dopo " << (iter + 1) << " iterazioni" << std::endl;
                 std::cout << "   Tensioni nodali:" << std::endl;
@@ -195,9 +196,9 @@ public:
     
     bool solve(double input_voltage) {
         static int sample_count = 0;
-
+        
         // Newton-Raphson iteration
-        double final_error = 0.0;
+        double final_error_sq = 0.0;
         
         for (int iter = 0; iter < max_iterations; iter++) {
             G.setZero();
@@ -206,8 +207,6 @@ public:
             for (auto& component : circuit.components) {   
                 component->stamp(G, I, V, dt);
             }
-
-            double input_g = 1.0 / input_impedance;
             
             if (circuit.input_node > 0) {
                 G(circuit.input_node, circuit.input_node) += input_g;
@@ -218,14 +217,15 @@ public:
             I(0) = 0.0;
             
             // Solve linear system (usa LU per robustezza)
-            Eigen::VectorXd V_new = G.lu().solve(I);
+            lu_solver.compute(G);
+            V_new = lu_solver.solve(I);
             
             // Check convergence
-            double error = (V_new - V).norm();
-            final_error = error;  // Salva per debug
+            double error_sq = (V_new - V).squaredNorm();
+            final_error_sq = error_sq;  // Salva per debug
             
             // Convergence check
-            if (error < tolerance) {
+            if (error_sq < tolerance_sq) {
                 V = V_new;  // ✓ Aggiorna SOLO quando converge
                 
                 // Update component history
@@ -242,7 +242,7 @@ public:
         }
         
         if (sample_count < max_non_convergence_warning) {
-            std::cerr << "WARNING: Sample " << sample_count << " did not converge after " << max_iterations  << " iterations with final error: " << final_error << std::endl;
+            std::cerr << "WARNING: Sample " << sample_count << " did not converge after " << max_iterations  << " iterations with final error: " << final_error_sq<< std::endl;
             printDCOperatingPoint();
         }
         
@@ -272,7 +272,7 @@ public:
 
     // Configuration
     void setMaxIterations(int iter) { max_iterations = iter; }
-    void setTolerance(double tol) { tolerance = tol; }
+    void setTolerance(double tol) { tolerance_sq = tol*tol; }
 };
 
 #endif

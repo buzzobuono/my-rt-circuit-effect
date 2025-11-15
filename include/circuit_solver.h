@@ -43,6 +43,9 @@ private:
         }
         std::cout << "   Circuit stabilized after " << (warmup_samples * dt * 1000) << " ms" << std::endl;
         std::cout << std::endl;
+        sample_count = 0;
+        failed_count = 0;
+        iteration_count = 0;
     }
     
 public:

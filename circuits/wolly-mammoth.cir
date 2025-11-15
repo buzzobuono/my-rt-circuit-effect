@@ -10,13 +10,13 @@ Q1 1 3 0 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
 Q2 2 1 5 Q2N3904 Is=4.639e-15 Bf=160.1 Br=5.944 Vt=0.026
 
 R2 3 4 100k
-Ppinch 4 5 8 500k 0.2 LIN
+Ppinch 4 5 8 500k 0.5 LIN
 *Rwire1 8 5 1m
 W1 8 5
 
 C6 5 6 100e-6
 R1 8 0 2.2k
-Pwool 6 11 0 2k 0.9 LIN
+Pwool 6 11 0 2k 0.5 LIN
 
 C1 7 3 0.22e-6
 C2 3 0 10e-9
@@ -32,7 +32,7 @@ R6 11 12 5.1k
 C4 12 0 7.4e-9
 C4b 12 0 220e-9
 
-Peq 12 10 13 10k 0.2 LIN
+Peq 12 10 13 10k 0.8 LIN
 Pvol 13 0 14 10k .9 LIN
 
 .input 7

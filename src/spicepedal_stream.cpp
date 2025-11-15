@@ -61,7 +61,7 @@ private:
     std::unique_ptr<CircuitSolver> solver;
     double sample_rate;
     double input_gain;
-    int input_impedance;
+    int source_impedance;
     int buffer_size;
     std::map<int, std::atomic<float>> paramIds;
     int currentParamIndex = 0;
@@ -70,21 +70,21 @@ public:
     SpicePedalStreamingProcessor(const std::string& netlist_file,
                           double sample_rate,
                           double input_gain,
-                          int input_impedance,
+                          int source_impedance,
                           int max_iterations,
                           double tolerance,
                           int buffer_size
                           )
         : sample_rate(sample_rate),
           input_gain(input_gain),
-          input_impedance(input_impedance),
+          source_impedance(source_impedance),
           buffer_size(buffer_size)
     {
         if (!circuit.loadNetlist(netlist_file)) {
             throw std::runtime_error("Failed to load netlist");
         }
 
-        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance, max_iterations, tolerance);
+        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
 
         initializeParameters();
     }
@@ -295,22 +295,22 @@ public:
 // MAIN
 // =============================================================
 int main(int argc, char* argv[]) {
-    CLI::App app{"Pedal Circuit Simulator — WAV Streaming Player"};
-
+    CLI::App app{"SpicePedal: a realtime simple spice-like simulator for audio"};
+    
     std::string input_file;
     std::string netlist_file;
     double input_gain = 1.0;
-    int input_impedance = 25000;
+    int source_impedance = 25000;
     int max_iterations;
     double tolerance;
     int buffer_size = 128;
     
-    app.add_option("-i,--input", input_file, "File di input WAV")
+    app.add_option("-i,--input", input_file, "Input File")
         ->check(CLI::ExistingFile);
-    app.add_option("-c,--circuit", netlist_file, "Netlist del circuito SPICE")
+    app.add_option("-c,--circuit", netlist_file, "Netlist File")
         ->check(CLI::ExistingFile)
         ->required();
-    app.add_option("-I,--input-impedance", input_impedance, "Impedenza d'ingresso [Ohm]")
+    app.add_option("-I,--source_impedance", source_impedance, "Source Impedance")
         ->check(CLI::Range(0, 30000))
         ->default_val(25000);
     app.add_option("-g,--input-gain", input_gain, "Input Gain")
@@ -337,7 +337,7 @@ int main(int argc, char* argv[]) {
         double sample_rate = sf_info.samplerate;
         sf_close(tmp);
 
-        SpicePedalStreamingProcessor processor(netlist_file, sample_rate, input_gain, input_impedance, max_iterations, tolerance, buffer_size);
+        SpicePedalStreamingProcessor processor(netlist_file, sample_rate, input_gain, source_impedance, max_iterations, tolerance, buffer_size);
         if (!processor.processAndPlay(input_file))
             return 1;
 

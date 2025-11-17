@@ -19,10 +19,14 @@ private:
     
     Eigen::PartialPivLU<Eigen::MatrixXd> lu_solver;
     
+    uint64_t sample_count = 0;
+    uint64_t failed_count = 0;
+    uint64_t iteration_count = 0;
+    
     double dt;
     int max_iterations;
     double tolerance_sq;
-    double input_g;
+    double source_g;
     int max_non_convergence_warning;
     std::ofstream logFile;
     bool logging_enabled = false;
@@ -37,15 +41,18 @@ private:
         }
         std::cout << "   Circuit stabilized after " << (warmup_samples * dt * 1000) << " ms" << std::endl;
         std::cout << std::endl;
+        sample_count = 0;
+        failed_count = 0;
+        iteration_count = 0;
     }
 
     
     
 public:
-    CircuitSolver(Circuit& ckt, double sample_rate, int input_impedance, int max_iterations, double tolerance, int max_non_convergence_warning = 50) 
+    CircuitSolver(Circuit& ckt, double sample_rate, int source_impedance, int max_iterations, double tolerance, int max_non_convergence_warning = 50) 
         : circuit(ckt), 
           dt(1.0 / sample_rate),
-          input_g(1.0 / input_impedance),
+          source_g(1.0 / source_impedance),
           max_iterations(max_iterations),
           tolerance_sq(tolerance*tolerance),
           max_non_convergence_warning(max_non_convergence_warning) {
@@ -82,55 +89,33 @@ public:
     }
     
     bool solveDC() {
-        using namespace Eigen;
-        std::cout << "Calcolo punto di lavoro DC" << std::endl;
-
-        MatrixXd Gdc = MatrixXd::Zero(circuit.num_nodes, circuit.num_nodes);
-        VectorXd Idc = VectorXd::Zero(circuit.num_nodes);
-        
-        // Iterazione Newton-Raphson per componenti non lineari
-        VectorXd Vdc = VectorXd::Zero(circuit.num_nodes);
+        std::cout << "DC Analysis" << std::endl;
         
         for (int iter = 0; iter < max_iterations; iter++) {
-            Gdc.setZero();
-            Idc.setZero();
+            G.setZero();
+            I.setZero();
             
             for (auto& comp : circuit.components) {
                 // Passo dt=0 per indicare analisi DC
-                comp->stamp(Gdc, Idc, Vdc, 0.0);
+                comp->stamp(G, I, V, 0.0);
             }
 
             // Nodo di massa forzato
-            Gdc.row(0).setZero();
-            Gdc.col(0).setZero();
-            Gdc(0, 0) = 1.0;
-            Idc(0) = 0.0;
+            G.row(0).setZero();
+            G.col(0).setZero();
+            G(0, 0) = 1.0;
+            I(0) = 0.0;
 
-            // Soluzione del sistema
-            VectorXd Vdc_new = Gdc.lu().solve(Idc);
+            V_new = G.lu().solve(I);
             
             double error_sq = (V_new - V).squaredNorm();
-            Vdc = Vdc_new;
-            
+            V = V_new;
             if (error_sq < tolerance_sq) {
-                // Convergenza raggiunta
-                std::cout << "   Convergenza raggiunta dopo " << (iter + 1) << " iterazioni" << std::endl;
-                std::cout << "   Tensioni nodali:" << std::endl;
-                for (int i = 0; i < circuit.num_nodes; ++i) {
-                    std::cout << "      Nodo " << i << ": " << Vdc(i) << " V" << std::endl;
-                }
-                
-                std::cout << std::endl;
-                
-                // Copia le tensioni DC come condizioni iniziali
-                V = Vdc;
-
+                printDCOperatingPoint();
                 return true;
             }
         }
-        
-        // Non convergenza
-        std::cerr << "ERRORE: Analisi DC non convergente dopo " << max_iterations << " iterazioni" << std::endl;
+        std::cerr << "ERROR: DC Analysis not convergent after " << max_iterations << " iterations" << std::endl;
         return false;
     }
 
@@ -156,9 +141,9 @@ public:
         std::cout << "Probe file opened: " << filename << std::endl;
     }
     
-    void logProbes(double time) {
+    void logProbes() {
         if (!logging_enabled) return;
-        
+        double time = sample_count * dt;
         logFile << std::fixed << std::setprecision(9) << time;
         
         for (auto& p : circuit.probes) {
@@ -195,7 +180,7 @@ public:
     }
     
     bool solve(double input_voltage) {
-        static int sample_count = 0;
+        sample_count++;
         
         // Newton-Raphson iteration
         double final_error_sq = 0.0;
@@ -209,10 +194,13 @@ public:
             }
             
             if (circuit.input_node > 0) {
-                G(circuit.input_node, circuit.input_node) += input_g;
-                I(circuit.input_node) += input_voltage * input_g;
+                G(circuit.input_node, circuit.input_node) += source_g;
+                I(circuit.input_node) += input_voltage * source_g;
             }
-            // Ground node constraint (DOPO stamp per sicurezza)
+            
+            // Ground node constraint
+            G.row(0).setZero();
+            G.col(0).setZero();
             G(0, 0) = 1.0;
             I(0) = 0.0;
             
@@ -222,23 +210,18 @@ public:
             
             // Check convergence
             double error_sq = (V_new - V).squaredNorm();
-            final_error_sq = error_sq;  // Salva per debug
-            
+            V = V_new;
             // Convergence check
             if (error_sq < tolerance_sq) {
-                V = V_new;  // ✓ Aggiorna SOLO quando converge
-                
                 // Update component history
                 for (auto& comp : circuit.components) {
                     comp->updateHistory(V, dt);
                 }
 
-                logProbes(sample_count * dt);
-                sample_count++;
+                logProbes();
+                iteration_count += iter + 1;
                 return true;
             }
-            
-            V = V_new;
         }
         
         if (sample_count < max_non_convergence_warning) {
@@ -246,9 +229,26 @@ public:
             printDCOperatingPoint();
         }
         
-        logProbes(sample_count * dt);
-        sample_count++;
+        logProbes();
+        failed_count++;
+        iteration_count += max_iterations;
         return false;
+    }
+    
+    double getFailurePercentage() {
+        return (sample_count > 0) ? (100.0 * failed_count / sample_count) : 0.0;
+    }
+    
+    double getTotalIterations() {
+        return iteration_count;
+    }
+    
+    double getTotalSamples() {
+        return sample_count;
+    }
+    
+    double getMeanIterations() {
+        return (sample_count > 0) ? (1.0 * iteration_count / sample_count) : 0.0;
     }
     
     double getOutputVoltage() const {
@@ -256,7 +256,6 @@ public:
     }
     
     void printDCOperatingPoint() {
-        std::cout << "DC Operating Point" << std::endl;
         for (int i = 0; i < circuit.num_nodes; i++) {
             std::cout << "   Node " << i << ": " << V(i) << " V" << std::endl;
         }
@@ -268,11 +267,6 @@ public:
         circuit.reset();
     }
     
-    const Eigen::VectorXd& getVoltages() const { return V; }
-
-    // Configuration
-    void setMaxIterations(int iter) { max_iterations = iter; }
-    void setTolerance(double tol) { tolerance_sq = tol*tol; }
 };
 
 #endif

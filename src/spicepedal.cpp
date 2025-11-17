@@ -20,7 +20,7 @@ private:
     int input_frequency;
     int input_duration;
     float max_input_voltage;
-    int input_impedance;
+    int source_impedance;
     bool bypass;
     int max_iterations;
     double tolerance;
@@ -32,7 +32,7 @@ public:
                      int input_frequency,
                      int input_duration,
                      float max_input_voltage,
-                     int input_impedance,
+                     int source_impedance,
                      bool bypass,
                      int max_iterations,
                      double tolerance
@@ -42,7 +42,7 @@ public:
           input_frequency(input_frequency),
           input_duration(input_duration),
           max_input_voltage(max_input_voltage),
-          input_impedance(input_impedance),
+          source_impedance(source_impedance),
           bypass(bypass),
           max_iterations(max_iterations),
           tolerance(tolerance)
@@ -51,7 +51,7 @@ public:
             throw std::runtime_error("Failed to load netlist");
         }
         
-        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, input_impedance, max_iterations, tolerance);
+        solver = std::make_unique<CircuitSolver>(circuit, sample_rate, source_impedance, max_iterations, tolerance);
     }
 
     bool process(const std::string &input_file, const std::string &output_file)
@@ -172,6 +172,10 @@ public:
             
             std::cout << "Process Statistics:" << std::endl;
             std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
+            std::cout << "  Solver's Failure Percentage: " << solver->getFailurePercentage() << " %" << std::endl;
+            std::cout << "  Solver's Tolal Samples: " << solver->getTotalSamples() << std::endl;
+            std::cout << "  Solver's Total Iterations: " << solver->getTotalIterations() << std::endl;
+            std::cout << "  Solver's Mean Iterations: " << solver->getMeanIterations() << std::endl;
             std::cout << std::endl;
             
             if (!output_file.empty()) {
@@ -279,7 +283,7 @@ int main(int argc, char *argv[]) {
     float input_frequency = 440;
     int input_duration = 2;
     float max_input_voltage = 0.15;
-    int input_impedance = 25000;
+    int source_impedance = 25000;
     int sample_rate = 44100;
     std::string output_file;
     std::string netlist_file;
@@ -293,7 +297,7 @@ int main(int argc, char *argv[]) {
     app.add_option("-f,--input-frequency", input_frequency, "Input Frequency")->default_val(input_frequency);
     app.add_option("-d,--input-duration", input_duration, "Input Duration")->default_val(input_duration);
     app.add_option("-v,--input-voltage-amplitude", max_input_voltage, "Max Input Voltage")->check(CLI::Range(0.0f, 5.0f))->default_val(max_input_voltage);
-    app.add_option("-I,--input-impedance", input_impedance, "Input Impedance")->check(CLI::Range(0, 30000))->default_val(input_impedance);
+    app.add_option("-I,--source_impedance", source_impedance, "Source Impedance")->check(CLI::Range(0, 30000))->default_val(source_impedance);
     app.add_option("-s,--sample-rate", sample_rate, "Sample Rate");
     
     app.add_option("-o,--output-file", output_file, "Output File");
@@ -312,7 +316,7 @@ int main(int argc, char *argv[]) {
     std::cout << "   Input Frequency: " << input_frequency << "Hz" << std::endl;
     std::cout << "   Input Duration: " << input_duration << "s" << std::endl;
     std::cout << "   Input Voltage Amplitude: " << max_input_voltage << "V" << std::endl;
-    std::cout << "   Input Impedance: " << input_impedance << "Ω" << std::endl;
+    std::cout << "   Source Impedance: " << source_impedance << "Ω" << std::endl;
     std::cout << "   Sample Rate: " << sample_rate << "Hz" << std::endl;
     std::cout << "   Output File: " << output_file << std::endl;
     std::cout << "   Circuit File: " << netlist_file << std::endl;
@@ -322,7 +326,7 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl;
 
     try {
-        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, max_input_voltage, input_impedance, bypass, max_iterations, tolerance);
+        SpicePedalProcessor processor(analysis_type, netlist_file, sample_rate, input_frequency, input_duration, max_input_voltage, source_impedance, bypass, max_iterations, tolerance);
         if (!processor.process(input_file, output_file)) {
             return 1;
         }
@@ -334,4 +338,3 @@ int main(int argc, char *argv[]) {
     return 0;
     
 }
-

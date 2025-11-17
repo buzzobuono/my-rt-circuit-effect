@@ -4,7 +4,8 @@ SpicePedal is a realtime simple spice-like simulator for audio.
 
 ## TODO
 
-- [ ] Undurstsnd convergence issues in *Wolly Mammoth* circuit
+- [ ] Understand convergence issues in *Wolly Mammoth* circuit
+- [ ] Add dumpling in Newton-Raphson and measure sistematically performamce
 - [ ] Optimize performamce for real time *solve()* method
 - [ ] Implement *getCurrent()* for all component
 - [ ] Test Mosfet component in a circuit

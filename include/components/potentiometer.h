@@ -26,9 +26,9 @@ private:
     double _r1_val; // n1-nw
     double _r2_val; // n2-nw
 
-    static constexpr double R_MIN = 1e-6;
-    static constexpr double R_MAX = 1e9;
-
+    const double R_MIN = 1e-12;
+    const double R_MAX = 1e12;
+    
     // Applica il tipo di taper
     double applyTaper(double pos) const
     {

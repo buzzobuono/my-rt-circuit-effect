@@ -1,8 +1,9 @@
 .title Partitore di tensione
 
 VCC 1 0 DC 9.0
-RB_TOP 1 2 820k
-RB_BOT 2 0 120k
+*RB_TOP 1 2 50k
+*RB_BOT 2 0 50k
+Pdivider 1 0 2 1M 0.5 LIN
 
-.input 2
+.input 1
 .output 2

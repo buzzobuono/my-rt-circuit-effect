@@ -102,39 +102,63 @@ public:
         }
     }
 
-    void handleKeyPress(int c) {
-        if (paramIds.empty()) return;
-        float value;
-        switch (c) {
-            case 'w': case 'W':
-                value =  std::min(1.0f, paramIds[currentParamIndex].load() + 0.05f);
-                paramIds[currentParamIndex].store(value);
-                circuit.setParamValue(currentParamIndex, value);
-                break;
-            case 's': case 'S':
-                value =  std::max(0.0f, paramIds[currentParamIndex].load() - 0.05f);
-                paramIds[currentParamIndex].store(value);
-                circuit.setParamValue(currentParamIndex, value);
-                break;
-            case 'a': case 'A':
-                currentParamIndex = (currentParamIndex - 1 + paramIds.size()) % paramIds.size();
-                std::cout << "Current param index " << currentParamIndex << std::endl;
-                break;
-            case 'd': case 'D':
-                currentParamIndex = (currentParamIndex + 1) % paramIds.size();
-                std::cout << "Current param index " << currentParamIndex << std::endl;
-                break;
+    bool handleKeyPress() {
+        if (paramIds.empty()) return true;
+        if (kbhit()) {
+            int c = getch();
+            if (c == 'q') { // Quit
+                return false;
+            } else {
+                float value;
+                if (c == 27) {
+                    if (!kbhit()) return true;  
+                    int c2 = getch();
+                    if (c2 != '[') return true;
+
+                    if (!kbhit()) return true;
+                    int c3 = getch();
+
+                    switch (c3) {
+                        case 'A':  // ↑
+                            value = std::min(1.0f, paramIds[currentParamIndex].load() + 0.05f);
+                            paramIds[currentParamIndex].store(value);
+                            circuit.setParamValue(currentParamIndex, value);
+                            break;
+
+                        case 'B':  // ↓
+                            value = std::max(0.0f, paramIds[currentParamIndex].load() - 0.05f);
+                            paramIds[currentParamIndex].store(value);
+                            circuit.setParamValue(currentParamIndex, value);
+                            break;
+
+                        case 'D':  // ←
+                            currentParamIndex = (currentParamIndex - 1 + paramIds.size()) % paramIds.size();
+                            std::cout << "Current param index " << currentParamIndex << std::endl;
+                            break;
+
+                        case 'C':  // →
+                            currentParamIndex = (currentParamIndex + 1) % paramIds.size();
+                            std::cout << "Current param index " << currentParamIndex << std::endl;
+                            break;
+                    }
+
+                    return true; 
+                }
+            }
         }
+        return true;
     }
 
     void printControls() {
-        std::cout << "╔══════════════════════════════════════════╗" << std::endl;
-        std::cout << "║          CONTROLLI LIVE                  ║" << std::endl;
-        std::cout << "╠══════════════════════════════════════════╣" << std::endl;
-        std::cout << "║  W/S : Aumenta/Diminuisci parametro      ║" << std::endl;
-        std::cout << "║  A/D : Parametro precedente/successivo   ║" << std::endl;
-        std::cout << "║  ESC : Esci                              ║" << std::endl;
-        std::cout << "╚══════════════════════════════════════════╝" << std::endl;
+        std::cout << "╔══════════════════════════════════════════════════╗" << std::endl;
+        std::cout << "║                 Live Controls                    ║" << std::endl;
+        std::cout << "╠══════════════════════════════════════════════════╣" << std::endl;
+        std::cout << "║  ↑ : Decrease Current Parameter                  ║" << std::endl;
+        std::cout << "║  ↓ : Decrease Current Parameter                  ║" << std::endl;
+        std::cout << "║  ← : Previous Parameter                          ║" << std::endl;
+        std::cout << "║  → : Next Parameter                              ║" << std::endl;
+        std::cout << "║  q     : Quit                                    ║" << std::endl;
+        std::cout << "╚══════════════════════════════════════════════════╝" << std::endl;
         std::cout << std::endl;
     }
 
@@ -178,24 +202,14 @@ public:
         setNonBlocking(true);
         
         printControls();
-
-        std::cout << "\nControlli: W (aumenta) | S (diminuisce) | ESC (esci)\n";
-        std::cout << "Buffer size: " << buffer_size << " frames\n";
-        std::cout << "Channels: " << sfinfo.channels << "\n\n";
-
+        
         std::thread inputThread([&]() {
             while (running) {
-                if (kbhit()) {
-                    int c = getch();
-                    if (c == 27) { // ESC
-                        running = false;
-                    } else {
-                        handleKeyPress(c);
-                    }
-                }
+                running = handleKeyPress();
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         });
+
 
         sf_count_t readcount;
         while (running) {

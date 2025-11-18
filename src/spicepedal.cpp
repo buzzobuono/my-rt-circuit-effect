@@ -173,7 +173,7 @@ public:
             std::cout << "Process Statistics:" << std::endl;
             std::cout << "  Solver's Execution Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " us" << std::endl;
             std::cout << "  Solver's Failure Percentage: " << solver->getFailurePercentage() << " %" << std::endl;
-            std::cout << "  Solver's Tolal Samples: " << solver->getTotalSamples() << std::endl;
+            std::cout << "  Solver's Total Samples: " << solver->getTotalSamples() << std::endl;
             std::cout << "  Solver's Total Iterations: " << solver->getTotalIterations() << std::endl;
             std::cout << "  Solver's Mean Iterations: " << solver->getMeanIterations() << std::endl;
             std::cout << std::endl;
